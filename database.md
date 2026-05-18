@@ -1,4 +1,4 @@
-# Dokumentasi Skema Database: Proyek Absensi Digital (PBL 2026)
+# Dokumentasi Skema Database: Proyek Absensi Digital (PBL 2026) awokawokawok
 
 ## 1. Autentikasi & Pengguna (User Management)
 > Kelompok tabel ini mengurus hak akses dan detail profil setiap aktor yang ada di dalam aplikasi.
