@@ -1,4 +1,4 @@
-# Dokumentasi Skema Database: Proyek Absensi Digital (PBL 2026) awokawokawok
+# Dokumentasi Skema Database: Proyek Absensi Digital (PBL 2026)
 
 ## 1. Autentikasi & Pengguna (User Management)
 > Kelompok tabel ini mengurus hak akses dan detail profil setiap aktor yang ada di dalam aplikasi.
@@ -69,9 +69,8 @@
 | `id_sekolah` | INT | **Primary Key** |
 | `nama_sekolah` | VARCHAR | Nama instansi |
 | `alamat` | TEXT | Alamat lengkap instansi |
-| `latitude_pusat` | FLOAT | Titik koordinat latitude instansi |
-| `longitude_pusat` | FLOAT | Titik koordinat longitude instansi |
 | `radius_meter` | INT | Batas jarak absensi yang diizinkan (dalam meter) |
+| `titik_koordinat` | GEOGRAPHY(Point, 4326) | Titik koordinat instansi dalam format spasial PostGIS |
 
 ### Tabel `master_kelas`
 > Menyimpan nama-nama rombongan belajar.
@@ -170,10 +169,8 @@
 | `tanggal` | DATE | Tanggal pencatatan absensi |
 | `jam_masuk` | TIME | Jam aktual siswa melakukan check-in |
 | `jam_pulang` | TIME | Jam aktual siswa melakukan check-out |
-| `lat_masuk` | FLOAT | Titik koordinat latitude saat check-in |
-| `lon_masuk` | FLOAT | Titik koordinat longitude saat check-in |
-| `lat_pulang` | FLOAT | Titik koordinat latitude saat check-out |
-| `lon_pulang` | FLOAT | Titik koordinat longitude saat check-out |
+| `koordinat_masuk` | GEOGRAPHY(Point, 4326) | Titik koordinat saat check-in dalam format spasial PostGIS |
+| `koordinat_pulang` | GEOGRAPHY(Point, 4326) | Titik koordinat saat check-out dalam format spasial PostGIS |
 | `foto_masuk` | VARCHAR | URL/Path bukti foto check-in |
 | `foto_pulang` | VARCHAR | URL/Path bukti foto check-out |
 | `status` | VARCHAR | Status kehadiran (Hadir, Telat, Alpha, dll) |
