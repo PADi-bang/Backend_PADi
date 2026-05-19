@@ -1,45 +1,11 @@
-const express = require('express');
-const { Pool } = require('pg');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { PrismaClient } = require('@prisma/client');
-const cors = require('cors');
+// d:\college\TI-2C\sem 4\App_PADi\backend\index.js
+
+const app = require('./src/app'); // Impor aplikasi dari app.js
 require('dotenv').config();
 
-const app = express();
+const PORT = process.env.PORT || 3000;
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL
+app.listen(PORT, () => {
+  console.log(`🚀 Server berjalan di http://localhost:${PORT}`);
+  console.log('Struktur aplikasi sudah dirapikan. app.js menangani logika, index.js menangani server.');
 });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
-app.use(cors());
-app.use(express.json());
-
-// Endpoint CRUD: Get All Items
-app.get('/items', async (req, res) => {
-    try {
-        const items = await prisma.item.findMany();
-        res.json(items);
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// Endpoint CRUD: Create Item
-app.post('/items', async (req, res) => {
-    const { name, description } = req.body;
-    try {
-        const newItem = await prisma.item.create({
-            data: {
-                name,
-                description
-            }
-        });
-        res.json(newItem);
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-app.listen(3000, () => console.log('Server running on port 3000'));
