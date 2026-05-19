@@ -3,10 +3,12 @@
 
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
+  extensions = [postgis]
 }
 
 // --- Enums ---
@@ -126,9 +128,8 @@ model Sekolah {
   id                  Int                   @id @default(autoincrement()) @map("id_sekolah")
   namaSekolah         String                @map("nama_sekolah")
   alamat              String
-  latitudePusat       Float                 @map("latitude_pusat")
-  longitudePusat      Float                 @map("longitude_pusat")
   radiusMeter         Int                   @map("radius_meter")
+  titikKoordinat      Unsupported("geography(Point, 4326)") @map("titik_koordinat")
   admins              Admin[]
   gurus               Guru[]
   siswas              Siswa[]
@@ -241,10 +242,8 @@ model Absensi {
   tanggal       DateTime      @db.Date
   jamMasuk      DateTime?     @map("jam_masuk") @db.Time
   jamPulang     DateTime?     @map("jam_pulang") @db.Time
-  latMasuk      Float?        @map("lat_masuk")
-  lonMasuk      Float?        @map("lon_masuk")
-  latPulang     Float?        @map("lat_pulang")
-  lonPulang     Float?        @map("lon_pulang")
+  koordinatMasuk  Unsupported("geography(Point, 4326)")? @map("koordinat_masuk")
+  koordinatPulang Unsupported("geography(Point, 4326)")? @map("koordinat_pulang")
   fotoMasuk     String?       @map("foto_masuk")
   fotoPulang    String?       @map("foto_pulang")
   status        AbsensiStatus
