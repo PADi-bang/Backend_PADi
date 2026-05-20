@@ -1,18 +1,285 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
+  extensions = [postgis]
 }
 
-model Item {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(255)
-  description String?  @db.Text
+// --- Enums ---
+
+enum RoleName {
+  Admin
+  Guru
+  Siswa
+}
+
+enum Semester {
+  Ganjil
+  Genap
+}
+
+enum AbsensiStatus {
+  Hadir
+  Telat
+  Alpha
+  Izin
+  Sakit
+}
+
+enum PerizinanJenis {
+  Sakit
+  Kepentingan
+}
+
+enum PerizinanStatus {
+  Pending
+  Disetujui
+  Ditolak
+}
+
+enum NotifikasiTipe {
+  Sistem
+  Pengingat
+  Peringatan
+}
+
+
+// --- 1. Autentikasi & Pengguna ---
+
+model Role {
+  id       Int      @id @default(autoincrement()) @map("id_role")
+  namaRole RoleName @map("nama_role")
+  users    User[]
+
+  @@map("role")
+}
+
+model User {
+  id       Int     @id @default(autoincrement()) @map("id_user")
+  roleId   Int     @map("id_role")
+  username String  @unique
+  password String
+  email    String  @unique
+  fcmToken String? @map("fcm_token")
+
+  role       Role         @relation(fields: [roleId], references: [id])
+  admin      Admin?
+  guru       Guru?
+  siswa      Siswa?
+  notifikasi Notifikasi[]
+
+  @@map("user")
+}
+
+model Admin {
+  id        Int    @id @default(autoincrement()) @map("id_admin")
+  userId    Int    @unique @map("id_user")
+  sekolahId Int    @map("id_sekolah")
+  namaAdmin String @map("nama_admin")
+
+  user    User    @relation(fields: [userId], references: [id])
+  sekolah Sekolah @relation(fields: [sekolahId], references: [id])
+
+  @@map("admin")
+}
+
+model Guru {
+  id          Int    @id @default(autoincrement()) @map("id_guru")
+  userId      Int    @unique @map("id_user")
+  sekolahId   Int    @map("id_sekolah")
+  namaLengkap String @map("nama_lengkap")
+  nip         String @unique @map("NIP")
+
+  user               User            @relation(fields: [userId], references: [id])
+  sekolah            Sekolah         @relation(fields: [sekolahId], references: [id])
+  enrolmentGuru      EnrolmentGuru[]
+  perizinanDisetujui Perizinan[]
+
+  @@map("guru")
+}
+
+model Siswa {
+  id          Int     @id @default(autoincrement()) @map("id_siswa")
+  userId      Int     @unique @map("id_user")
+  sekolahId   Int     @map("id_sekolah")
+  namaLengkap String  @map("nama_lengkap")
+  nis         String  @unique @map("NIS")
+  faceModel   String? @map("face_model")
+
+  user           User             @relation(fields: [userId], references: [id])
+  sekolah        Sekolah          @relation(fields: [sekolahId], references: [id])
+  enrolmentSiswa EnrolmentSiswa[]
+  absensi        Absensi[]
+  perizinan      Perizinan[]
+
+  @@map("siswa")
+}
+
+
+// --- 2. Master Data Institusi & Akademik ---
+
+model Sekolah {
+  id                  Int                   @id @default(autoincrement()) @map("id_sekolah")
+  namaSekolah         String                @map("nama_sekolah")
+  alamat              String
+  radiusMeter         Int                   @map("radius_meter")
+  titikKoordinat      Unsupported("geography(Point, 4326)") @map("titik_koordinat")
+  admins              Admin[]
+  gurus               Guru[]
+  siswas              Siswa[]
+  masterKelas         MasterKelas[]
+  masterAngkatan      MasterAngkatan[]
+  masterTahunAkademik MasterTahunAkademik[]
+  enrolmentKelas      EnrolmentKelas[]
+  jadwalAbsensi       JadwalAbsensi[]
+
+  @@map("sekolah")
+}
+
+model MasterKelas {
+  id             Int              @id @default(autoincrement()) @map("id_kelas")
+  sekolahId      Int              @map("id_sekolah")
+  namaKelas      String           @map("nama_kelas")
+  sekolah        Sekolah          @relation(fields: [sekolahId], references: [id])
+  enrolmentKelas EnrolmentKelas[]
+
+  @@map("master_kelas")
+}
+
+model MasterAngkatan {
+  id            Int              @id @default(autoincrement()) @map("id_angkatan")
+  sekolahId     Int              @map("id_sekolah")
+  nomorAngkatan String           @map("nomor_angkatan")
+  sekolah       Sekolah          @relation(fields: [sekolahId], references: [id])
+  enrolmentKelas EnrolmentKelas[]
+
+  @@map("master_angkatan")
+}
+
+model MasterTahunAkademik {
+  id             Int              @id @default(autoincrement()) @map("id_tahun_akademik")
+  sekolahId      Int              @map("id_sekolah")
+  tahunAjaran    String           @map("tahun_ajaran")
+  semester       Semester
+  isActive       Boolean          @map("is_active")
+  sekolah        Sekolah          @relation(fields: [sekolahId], references: [id])
+  enrolmentKelas EnrolmentKelas[]
+
+  @@map("master_tahun_akademik")
+}
+
+
+// --- 3. Relasi / Enrolment (Penempatan) ---
+
+model EnrolmentKelas {
+  id                  Int                 @id @default(autoincrement()) @map("id_enrolment_kelas")
+  sekolahId           Int                 @map("id_sekolah")
+  kelasId             Int                 @map("id_kelas")
+  angkatanId          Int                 @map("id_angkatan")
+  tahunAkademikId     Int                 @map("id_tahun_akademik")
+  keterangan          String?
+  sekolah             Sekolah             @relation(fields: [sekolahId], references: [id])
+  masterKelas         MasterKelas         @relation(fields: [kelasId], references: [id])
+  masterAngkatan      MasterAngkatan      @relation(fields: [angkatanId], references: [id])
+  masterTahunAkademik MasterTahunAkademik @relation(fields: [tahunAkademikId], references: [id])
+  enrolmentSiswa      EnrolmentSiswa[]
+  enrolmentGuru       EnrolmentGuru[]
+
+  @@map("enrolment_kelas")
+}
+
+model EnrolmentSiswa {
+  id               Int            @id @default(autoincrement()) @map("id_enrolment_siswa")
+  siswaId          Int            @map("id_siswa")
+  enrolmentKelasId Int            @map("id_enrolment_kelas")
+  isActive         Boolean        @map("is_active")
+  siswa            Siswa          @relation(fields: [siswaId], references: [id])
+  enrolmentKelas   EnrolmentKelas @relation(fields: [enrolmentKelasId], references: [id])
+
+  @@map("enrolment_siswa")
+}
+
+model EnrolmentGuru {
+  id               Int            @id @default(autoincrement()) @map("id_enrolment_guru")
+  guruId           Int            @map("id_guru")
+  enrolmentKelasId Int            @map("id_enrolment_kelas")
+  isActive         Boolean        @map("is_active")
+  guru             Guru           @relation(fields: [guruId], references: [id])
+  enrolmentKelas   EnrolmentKelas @relation(fields: [enrolmentKelasId], references: [id])
+
+  @@map("enrolment_guru")
+}
+
+
+// --- 4. Transaksi Operasional Aplikasi ---
+
+model JadwalAbsensi {
+  id             Int       @id @default(autoincrement()) @map("id_jadwal")
+  sekolahId      Int       @map("id_sekolah")
+  namaJadwal     String    @map("nama_jadwal")
+  hari           String
+  tanggal        DateTime  @db.Date
+  jamMasukStart  DateTime  @map("jam_masuk_start") @db.Time
+  jamMasukFinish DateTime  @map("jam_masuk_finish") @db.Time
+  jamPulang      DateTime  @map("jam_pulang") @db.Time
+  isLibur        Boolean   @map("is_libur")
+  sekolah        Sekolah   @relation(fields: [sekolahId], references: [id])
+  absensi        Absensi[]
+
+  @@map("jadwal_absensi")
+}
+
+model Absensi {
+  id            Int           @id @default(autoincrement()) @map("id_absensi")
+  siswaId       Int           @map("id_siswa")
+  jadwalId      Int           @map("id_jadwal")
+  tanggal       DateTime      @db.Date
+  jamMasuk      DateTime?     @map("jam_masuk") @db.Time
+  jamPulang     DateTime?     @map("jam_pulang") @db.Time
+  koordinatMasuk  Unsupported("geography(Point, 4326)")? @map("koordinat_masuk")
+  koordinatPulang Unsupported("geography(Point, 4326)")? @map("koordinat_pulang")
+  fotoMasuk     String?       @map("foto_masuk")
+  fotoPulang    String?       @map("foto_pulang")
+  status        AbsensiStatus
+  keterangan    String?
+  siswa         Siswa         @relation(fields: [siswaId], references: [id])
+  jadwalAbsensi JadwalAbsensi @relation(fields: [jadwalId], references: [id])
+
+  @@map("absensi")
+}
+
+model Perizinan {
+  id              Int             @id @default(autoincrement()) @map("id_perizinan")
+  siswaId         Int             @map("id_siswa")
+  tanggalMulai    DateTime        @map("tanggal_mulai") @db.Date
+  tanggalSelesai  DateTime        @map("tanggal_selesai") @db.Date
+  jenisIzin       PerizinanJenis  @map("jenis_izin")
+  alasan          String
+  fileBukti       String?         @map("file_bukti")
+  status          PerizinanStatus
+  disetujuiOlehId Int?            @map("disetujui_oleh")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  siswa           Siswa           @relation(fields: [siswaId], references: [id])
+  disetujuiOleh   Guru?           @relation(fields: [disetujuiOlehId], references: [id])
+
+  @@map("perizinan")
+}
+
+model Notifikasi {
+  id        Int            @id @default(autoincrement()) @map("id_notifikasi")
+  userId    Int            @map("id_user")
+  judul     String
+  tipe      NotifikasiTipe
+  isiPesan  String         @map("isi_pesan")
+  isRead    Boolean        @default(false) @map("is_read")
+  createdAt DateTime       @default(now()) @map("created_at")
+  user      User           @relation(fields: [userId], references: [id])
+
+  @@map("notifikasi")
 }

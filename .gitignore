@@ -1,5 +1,21 @@
+# Dependencies
 node_modules
+
+# Environment Variables
 # Keep environment variables out of version control
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
+/generated/prisma
+
+# Log files
+*.log
+npm-debug.log*
+
+# Editor directories and files
+.vscode
+.idea
 /generated/prisma
