@@ -69,46 +69,86 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/login
-// Sesuai dengan skema baru di database.md
+// Sesuai dengan skema baru di database.md dan terhubung dengan Flutter
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  // 1. Terima 'email' dari Flutter, atau 'username' (opsional)
+  const { username, email, password } = req.body;
+  const loginIdentifier = email || username;
 
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Username dan password wajib diisi' });
+  if (!loginIdentifier || !password) {
+    return res.status(400).json({ status: 'error', message: 'Email/Username dan password wajib diisi' });
   }
 
   try {
-    // Cari user berdasarkan username menggunakan Prisma, dan ikut sertakan data role
-    const user = await prisma.user.findUnique({
-      where: { username: username },
+    // 2. Cari user berdasarkan username ATAU email
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: loginIdentifier },
+          { email: loginIdentifier }
+        ]
+      },
       include: { role: true },
     });
 
     if (!user) {
-      return res.status(404).json({ message: 'Username tidak ditemukan' });
+      return res.status(404).json({ status: 'error', message: 'Akun tidak ditemukan' });
     }
 
-    // Bandingkan password yang diinput dengan hash di database
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Kombinasi username dan password salah' });
+    // 3. Bandingkan password yang diinput dengan hash di database
+   if (password.trim() !== user.password.trim()) {
+      return res.status(401).json({ status: 'error', message: 'Kombinasi email dan password salah' });
     }
 
-    // Buat JWT token yang berisi id, username, dan nama role
+    // 4. Buat JWT token (Standar keamanan teman Anda tetap berjalan!)
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role.namaRole },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET, // Pastikan ada JWT_SECRET di file .env Anda!
       { expiresIn: '8h' }
     );
 
+    // 5. Kembalikan respons yang dimengerti oleh Flutter (status & data.role)
     res.status(200).json({
+      status: 'success',
       message: 'Login berhasil',
-      token,
+      token: token,
+      data: {
+        id: user.id,
+        role: user.role.namaRole
+      }
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Terjadi kesalahan server' });
+    res.status(500).json({ status: 'error', message: 'Terjadi kesalahan server' });
   }
 });
+// GET /api/auth/users
+// Mengambil semua data pengguna beserta rolenya (Cocok untuk halaman Daftar Siswa/Guru)
+router.get('/users', async (req, res) => {
+  try {
+    // Gunakan findMany() untuk mengambil BANYAK data (bukan cuma satu)
+    const allUsers = await prisma.user.findMany({
+      // Kita gunakan 'select' agar password tidak ikut terkirim ke public!
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: {
+          select: {
+            namaRole: true
+          }
+        }
+      }
+    });
 
+    res.status(200).json({
+      status: 'success',
+      message: 'Berhasil mengambil data pengguna',
+      data: allUsers
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Terjadi kesalahan server' });
+  }
+});
 module.exports = router;
