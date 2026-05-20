@@ -1,9 +1,8 @@
+// backend/src/routes/auth.js
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const prisma = require('../config/prisma'); // Menggunakan Prisma Client
-require('dotenv').config();
+const prisma = require('../db');
 
 // POST /api/auth/register
 // Sesuai dengan skema baru di database.md

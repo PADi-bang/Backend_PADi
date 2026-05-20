@@ -8,12 +8,10 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-
+app.use(express.urlencoded({ extended: true }));
 // --- Pendaftaran Rute ---
 // Impor file-file rute Anda di sini
 const authRoutes = require('./routes/auth');
-
-// Daftarkan rute dengan prefix-nya masing-masing
 app.use('/api/auth', authRoutes);
 
 module.exports = app;
