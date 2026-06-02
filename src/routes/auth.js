@@ -91,12 +91,12 @@ router.post('/login', async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json({ status: 'error', message: 'Akun tidak ditemukan' });
+      return res.status(404).json({ status: 'error', message: 'Email atau password salah' });
     }
 
     // 3. Bandingkan password yang diinput dengan hash di database
    if (password.trim() !== user.password.trim()) {
-      return res.status(401).json({ status: 'error', message: 'Kombinasi email dan password salah' });
+      return res.status(401).json({ status: 'error', message: 'Email atau password salah' });
     }
 
     // 4. Buat JWT token (Standar keamanan teman Anda tetap berjalan!)
