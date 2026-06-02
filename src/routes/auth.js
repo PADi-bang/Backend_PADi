@@ -113,7 +113,8 @@ router.post('/login', async (req, res) => {
       token: token,
       data: {
         id: user.id,
-        role: user.role.namaRole
+        role: user.role.namaRole,
+        username: user.username
       }
     });
   } catch (err) {
