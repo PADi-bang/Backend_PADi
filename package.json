@@ -24,7 +24,11 @@
     "pg": "^8.21.0"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.4.0",
     "nodemon": "^3.1.14",
     "prisma": "^5.22.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }

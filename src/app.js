@@ -2,7 +2,7 @@
 
 const express = require('express');
 const cors = require('cors');
-
+const dashboardRoutes = require('./routes/dashboard')
 const app = express();
 
 // Middleware
@@ -13,5 +13,7 @@ app.use(express.urlencoded({ extended: true }));
 // Impor file-file rute Anda di sini
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
+
+app.use('/api/dashboard', dashboardRoutes);
 
 module.exports = app;

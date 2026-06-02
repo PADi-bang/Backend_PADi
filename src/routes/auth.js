@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const prisma = require('../db');
+const bcrypt = require('bcryptjs');
 
 // POST /api/auth/register
 // Sesuai dengan skema baru di database.md
@@ -94,8 +95,10 @@ router.post('/login', async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Email atau password salah' });
     }
 
-    // 3. Bandingkan password yang diinput dengan hash di database
-   if (password.trim() !== user.password.trim()) {
+   // 3. Bandingkan password yang diinput dengan hash di database MENGGUNAKAN BCRYPT
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    if (!isPasswordValid) {
       return res.status(401).json({ status: 'error', message: 'Email atau password salah' });
     }
 
