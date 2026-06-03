@@ -8,6 +8,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
   extensions = [postgis]
 }
 
@@ -129,7 +130,7 @@ model Sekolah {
   namaSekolah         String                @map("nama_sekolah")
   alamat              String
   radiusMeter         Int                   @map("radius_meter")
-  titikKoordinat      Unsupported("geography(Point, 4326)") @map("titik_koordinat")
+  titikKoordinat      Unsupported("geography(Point, 4326)")? @map("titik_koordinat")
   admins              Admin[]
   gurus               Guru[]
   siswas              Siswa[]
