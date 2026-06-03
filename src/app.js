@@ -3,11 +3,13 @@
 const express = require('express');
 const cors = require('cors');
 const dashboardRoutes = require('./routes/dashboard')
+const guruRoutes = require('./routes/guru');
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/api/guru', guruRoutes);
 app.use(express.urlencoded({ extended: true }));
 // --- Pendaftaran Rute ---
 // Impor file-file rute Anda di sini
