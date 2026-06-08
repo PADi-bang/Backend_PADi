@@ -26,9 +26,10 @@ async function main() {
   // Karena kolom titikKoordinat bertipe Unsupported, kita wajib menggunakan query SQL mentah
   await prisma.$executeRaw`
     INSERT INTO sekolah (id_sekolah, nama_sekolah, alamat, radius_meter, titik_koordinat)
-    VALUES (1, 'SMK Negeri 1 Jakarta', 'Jl. Budi Utomo No.7', 200, ST_GeomFromText('POINT(106.8372 -6.1664)', 4326))
+    VALUES (1, 'SMK Negeri 1 Jakarta', 'Jalan Prof. Soedarto, Tembalang', 400, ST_GeomFromText('POINT(110.4327263 -7.0524271)', 4326))
     ON CONFLICT (id_sekolah) DO NOTHING;
   `;
+
   console.log('✔️ Entitas Sekolah berhasil dibangun.');
 
   // 4. Membuat 1 Guru Utama
@@ -46,6 +47,27 @@ async function main() {
       },
       include: { guru: true }
     });
+  }
+
+  // 4.5 Membuat 1 Siswa Tetap Khusus Testing Geofencing (Diikat ke Polines)
+  let siswaTesting = await prisma.user.findFirst({ where: { username: 'tejo' } });
+  if (!siswaTesting) {
+    siswaTesting = await prisma.user.create({
+      data: {
+        roleId: 3,
+        username: 'tejo', // Gunakan username ini untuk login di emulator
+        password: passwordHash, // Passwordnya sama: 123
+        email: 'tejo.siswa@sekolah.ac.id',
+        siswa: {
+          create: { 
+            sekolahId: 1, // PENTING: 2 adalah ID untuk kampus Polines
+            namaLengkap: 'latejoki', 
+            nis: '12345678' 
+          }
+        }
+      }
+    });
+    console.log('✔️ Akun Siswa Testing (tejo) berhasil dibuat.');
   }
 
   // 5. Membuat Jadwal Absensi Dummy
