@@ -18,4 +18,7 @@ app.use('/api/auth', authRoutes);
 
 app.use('/api/dashboard', dashboardRoutes);
 
+const absensiRoutes = require('./routes/absensi');
+app.use('/api/absensi', absensiRoutes);
+
 module.exports = app;

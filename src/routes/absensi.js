@@ -23,21 +23,21 @@ function calculateEuclideanDistance(vec1, vec2) {
 // POST /api/absensi/masuk
 // Endpoint utama untuk alur absensi sesuai dokumen absen.md
 router.post('/masuk', async (req, res) => {
-  const { siswaId, faceEmbedding, latitude, longitude } = req.body;
+  const { userId, faceEmbedding, latitude, longitude } = req.body; // [DIUBAH] Menerima userId
 
-  if (!siswaId || !faceEmbedding || latitude === undefined || longitude === undefined) {
-    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: siswaId, faceEmbedding, latitude, dan longitude wajib diisi.' });
+  if (!userId || !faceEmbedding || latitude === undefined || longitude === undefined) {
+    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, faceEmbedding, latitude, dan longitude wajib diisi.' });
   }
 
   try {
     // --- Tahap 1: Ambil data siswa dan sekolah dari Database ---
-    const siswa = await prisma.siswa.findUnique({
-      where: { id: parseInt(siswaId) },
+    const siswa = await prisma.siswa.findUnique({ // [DIUBAH] Mencari profil siswa berdasarkan userId
+      where: { userId: parseInt(userId) },
       include: { sekolah: true } // Sertakan data sekolah untuk geofencing
     });
 
     if (!siswa) {
-      return res.status(404).json({ status: 'error', message: 'Siswa tidak ditemukan.' });
+      return res.status(404).json({ status: 'error', message: 'Profil siswa untuk user ini tidak ditemukan.' });
     }
     if (!siswa.faceModel) {
       return res.status(400).json({ status: 'error', message: 'Siswa ini belum mendaftarkan data wajah (face model).' });
@@ -65,6 +65,12 @@ router.post('/masuk', async (req, res) => {
         ) as "isWithinRadius"
         FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
     `;
+
+    // [PENAMBAHAN] Validasi hasil query PostGIS untuk mencegah crash jika data sekolah tidak lengkap
+    if (!locationCheckResult || !Array.isArray(locationCheckResult) || locationCheckResult.length === 0) {
+        console.error("Query Geofencing PostGIS tidak mengembalikan hasil yang valid untuk sekolahId:", siswa.sekolahId);
+        return res.status(500).json({ status: 'error', message: 'Gagal memvalidasi lokasi sekolah. Data sekolah mungkin tidak lengkap.' });
+    }
 
     if (!locationCheckResult[0]?.isWithinRadius) {
         return res.status(403).json({ status: 'error', message: 'Anda berada di luar radius sekolah yang diizinkan.' });
