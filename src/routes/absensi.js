@@ -56,13 +56,14 @@ router.post('/masuk', async (req, res) => {
     }
 
     // --- Tahap 3: Validasi Lokasi Berlapis (Geofencing di Backend) ---
-    // Menggunakan PostGIS via Prisma Raw Query untuk mencegah Fake GPS
+    // [DIUBAH] Menggunakan ST_Contains untuk validasi berdasarkan Poligon, bukan radius.
+    // Ini lebih akurat untuk area sekolah yang tidak berbentuk lingkaran.
+    // PRASYARAT: Tabel `sekolah` harus punya kolom `area_sekolah` dengan tipe data `geometry(Polygon, 4326)`.
     const locationCheckResult = await prisma.$queryRaw`
-        SELECT ST_DWithin(
-            titik_koordinat,
-            ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography,
-            radius_meter
-        ) as "isWithinRadius"
+        SELECT ST_Contains(
+            area_sekolah, 
+            ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
+        ) as "isWithinArea"
         FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
     `;
 
@@ -72,8 +73,8 @@ router.post('/masuk', async (req, res) => {
         return res.status(500).json({ status: 'error', message: 'Gagal memvalidasi lokasi sekolah. Data sekolah mungkin tidak lengkap.' });
     }
 
-    if (!locationCheckResult[0]?.isWithinRadius) {
-        return res.status(403).json({ status: 'error', message: 'Anda berada di luar radius sekolah yang diizinkan.' });
+    if (!locationCheckResult[0]?.isWithinArea) {
+        return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah yang diizinkan.' });
     }
 
     // --- Tahap 4: Validasi Jadwal Absensi ---

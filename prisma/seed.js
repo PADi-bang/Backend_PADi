@@ -22,15 +22,28 @@ async function main() {
   }
   console.log('✔️ Role berhasil disiapkan.');
 
-  // 3. Membuat Sekolah
-  // Karena kolom titikKoordinat bertipe Unsupported, kita wajib menggunakan query SQL mentah
+  // 3. Membuat Sekolah dengan Geofencing Poligon
+  // Menggunakan data poligon dari Politeknik Negeri Semarang sesuai permintaan
+  const poligonCoords = [
+    [110.4327263, -7.0524271], [110.4337617, -7.0523935], [110.4337296, -7.0529312],
+    [110.4339683, -7.0529472], [110.4335794, -7.054344], [110.4352939, -7.0549562],
+    [110.435449, -7.0544472], [110.4355802, -7.0539044], [110.4357049, -7.0533015],
+    [110.4358444, -7.0527704], [110.436075, -7.0519878], [110.4352972, -7.0515433],
+    [110.433771, -7.0507181], [110.4333311, -7.0511333], [110.4330119, -7.051703],
+    [110.432888, -7.0520138], [110.4327263, -7.0524271]
+  ];
+  const poligonWKT = `POLYGON((${poligonCoords.map(p => p.join(' ')).join(', ')}))`;
+
+  // Karena kolom areaSekolah bertipe Unsupported, kita wajib menggunakan query SQL mentah.
+  // ON CONFLICT (id_sekolah) DO UPDATE digunakan agar jika seeder dijalankan lagi, data poligonnya diperbarui.
   await prisma.$executeRaw`
-    INSERT INTO sekolah (id_sekolah, nama_sekolah, alamat, radius_meter, titik_koordinat)
-    VALUES (1, 'SMK Negeri 1 Jakarta', 'Jalan Prof. Soedarto, Tembalang', 400, ST_GeomFromText('POINT(110.4327263 -7.0524271)', 4326))
-    ON CONFLICT (id_sekolah) DO NOTHING;
+    INSERT INTO sekolah (id_sekolah, nama_sekolah, alamat, area_sekolah)
+    VALUES (1, 'SMK Negeri 1 Jakarta', 'Jalan Prof. Soedarto, Tembalang', ST_GeomFromText(${poligonWKT}, 4326))
+    ON CONFLICT (id_sekolah) DO UPDATE SET
+      area_sekolah = ST_GeomFromText(${poligonWKT}, 4326);
   `;
 
-  console.log('✔️ Entitas Sekolah berhasil dibangun.');
+  console.log('✔️ Entitas Sekolah berhasil dibangun/diperbarui dengan geofence poligon.');
 
   // 4. Membuat 1 Guru Utama
   let guru = await prisma.user.findFirst({ where: { username: 'budi_guru' }, include: { guru: true } });

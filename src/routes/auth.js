@@ -102,23 +102,61 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ status: 'error', message: 'Email atau password salah' });
     }
 
-    // 4. Buat JWT token (Standar keamanan teman Anda tetap berjalan!)
+    // --- [PERBAIKAN] Tahap 4.5: Ambil data spesifik role (Siswa) & Geofence ---
+    let responseData = {
+      id: user.id,
+      role: user.role.namaRole,
+      username: user.username,
+      // Siapkan object kosong untuk data tambahan
+      kelas: "Informasi Kelas",
+      geofence: null,
+    };
+
+    if (user.role.namaRole === 'Siswa') {
+      const siswa = await prisma.siswa.findUnique({
+        where: { userId: user.id },
+        include: {
+          sekolah: true, // Ambil data sekolah untuk mendapatkan geofence
+        }
+      });
+
+      if (siswa) {
+        // Menggunakan nama sekolah sebagai fallback jika info kelas belum ada
+        responseData.kelas = `Siswa • ${siswa.sekolah.namaSekolah}`;
+
+        // Ambil data geofence poligon menggunakan ST_AsGeoJSON
+        if (siswa.sekolahId) {
+          const geofenceResult = await prisma.$queryRaw`
+            SELECT ST_AsGeoJSON(area_sekolah) as polygon_geojson
+            FROM sekolah
+            WHERE id_sekolah = ${siswa.sekolahId} AND area_sekolah IS NOT NULL;
+          `;
+
+          if (geofenceResult.length > 0 && geofenceResult[0].polygon_geojson) {
+            const geoJson = JSON.parse(geofenceResult[0].polygon_geojson);
+            // Format GeoJSON adalah [ [ [lon, lat], [lon, lat] ] ]. Kita ambil array koordinatnya.
+            // Flutter mengharapkan array pasangan koordinat: [[lon, lat], [lon, lat], ...]
+            responseData.geofence = {
+              polygon: geoJson.coordinates[0] 
+            };
+          }
+        }
+      }
+    }
+
+    // 5. Buat JWT token
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role.namaRole },
       process.env.JWT_SECRET, // Pastikan ada JWT_SECRET di file .env Anda!
       { expiresIn: '8h' }
     );
 
-    // 5. Kembalikan respons yang dimengerti oleh Flutter (status & data.role)
+    // 6. Kembalikan respons yang sudah diperkaya dengan data geofence
     res.status(200).json({
       status: 'success',
       message: 'Login berhasil',
       token: token,
-      data: {
-        id: user.id,
-        role: user.role.namaRole,
-        username: user.username
-      }
+      data: responseData
     });
   } catch (err) {
     console.error(err);

@@ -129,8 +129,7 @@ model Sekolah {
   id                  Int                   @id @default(autoincrement()) @map("id_sekolah")
   namaSekolah         String                @map("nama_sekolah")
   alamat              String
-  radiusMeter         Int                   @map("radius_meter")
-  titikKoordinat      Unsupported("geography(Point, 4326)") @map("titik_koordinat")
+  areaSekolah         Unsupported("geography(Polygon, 4326)")? @map("area_sekolah")
   admins              Admin[]
   gurus               Guru[]
   siswas              Siswa[]
