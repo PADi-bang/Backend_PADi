@@ -1,20 +1,21 @@
 # Dependencies
-node_modules/
+node_modules
 
-# Environment Variables (Sangat Penting agar Password Database Aman)
+# Environment Variables
+# Keep environment variables out of version control
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
+/generated/prisma
+
 # Log files
 *.log
 npm-debug.log*
 
 # Editor directories and files
-.vscode/
-.idea/
-
-# Prisma
+.vscode
+.idea
 /generated/prisma
