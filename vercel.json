@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "builds": [
     {
       "src": "src/app.js",
@@ -7,16 +6,16 @@
       "config": {
         "includeFiles": [
           "node_modules/.prisma/client/**/*",
-          "views/**/*",
-          "public/**/*"
+          "views/**",
+          "public/**"
         ]
       }
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "src/app.js"
+      "source": "/(.*)",
+      "destination": "/src/app.js"
     }
   ]
 }
