@@ -1,11 +1,7 @@
 {
   "functions": {
     "src/app.js": {
-      "includeFiles": [
-        "views/**",
-        "public/**",
-        "node_modules/.prisma/client/**"
-      ]
+      "includeFiles": "{views/**,public/**,node_modules/.prisma/client/**}"
     }
   },
   "rewrites": [
