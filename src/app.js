@@ -13,8 +13,10 @@ const app = express();
 
 // --- Pengaturan Web Admin (EJS) ---
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-app.use(express.static(path.join(__dirname, 'public')));
+// [PERBAIKAN] Ditambahkan '..' agar Vercel mundur satu folder untuk mencari 'views'
+app.set('views', path.join(__dirname, '..', 'views'));
+// [PERBAIKAN] Ditambahkan '..' agar Vercel mundur satu folder untuk mencari 'public'
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // --- Middleware ---
 app.use(cors());
@@ -25,7 +27,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/guru', guruRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/guru', guruRoutes);
 app.use('/api/jadwal', jadwalRoutes);
 app.use('/api/absensi', absensiRoutes); 
 
