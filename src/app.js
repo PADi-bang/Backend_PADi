@@ -64,7 +64,7 @@ app.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         // Trik Sakti: Mengambil domain aktif secara dinamis (bisa localhost / vercel)
-        const host Aktif = `${req.protocol}://${req.get('host')}`;
+        const hostAktif = `${req.protocol}://${req.get('host')}`;
         
         const response = await axios.post(`${hostAktif}/api/auth/login`, {
             email: email,
