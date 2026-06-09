@@ -6,6 +6,7 @@ const path = require('path'); // Tambahan wajib untuk membaca folder EJS & Publi
 const dashboardRoutes = require('./routes/dashboard');
 const guruRoutes = require('./routes/guru');
 const authRoutes = require('./routes/auth');
+const jadwalRoutes = require('./routes/jadwal');
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/guru', guruRoutes);
+app.use('/api/jadwal', jadwalRoutes);
 
 // --- 4. PENDAFTARAN RUTE WEB ADMIN (AKSES BROWSER) ---
 // Saat web utama (localhost:3000 atau URL Render) dibuka, tampilkan halaman Login
