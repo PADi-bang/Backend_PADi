@@ -56,7 +56,7 @@ app.use('/api/absensi', absensiRoutes);
 
 // Halaman Login Web Admin
 app.get('/', (req, res) => {
-    res.render('login', { error: req.query.error });
+    res.render('Login', { error: req.query.error });
 });
 
 // Proses Login Web Admin (Menembak API Internal)
