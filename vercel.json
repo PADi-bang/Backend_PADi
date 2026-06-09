@@ -1,18 +1,13 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "src/app.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "node_modules/.prisma/client/**/*",
-          "views/**/*",
-          "public/**/*"
-        ]
-      }
+  "functions": {
+    "src/app.js": {
+      "includeFiles": [
+        "views/**",
+        "public/**",
+        "node_modules/.prisma/client/**"
+      ]
     }
-  ],
+  },
   "rewrites": [
     {
       "source": "/(.*)",
