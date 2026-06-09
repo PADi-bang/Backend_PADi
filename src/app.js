@@ -15,9 +15,10 @@ const app = express();
 
 // --- Pengaturan Web Admin (EJS) ---
 app.set('view engine', 'ejs');
-// Mundur satu folder ('..') karena file ini berada di dalam folder 'src'
-app.set('views', path.join(__dirname, '..', 'views'));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// [PERBAIKAN JALUR] Mundur dua folder (dari src -> backend -> root), lalu masuk ke frontend/web
+app.set('views', path.join(__dirname, '../../frontend/web/views'));
+app.use(express.static(path.join(__dirname, '../../frontend/web/public')));
 
 // --- Middleware Dasar ---
 app.use(cors());
