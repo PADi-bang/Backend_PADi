@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "src/app.js",
-  "scripts": {
+ "scripts": {
     "start": "node src/app.js",
     "init-db": "node init-db.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npx prisma generate",
-    "postinstall": "npx prisma generate"
+    "vercel-build": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
