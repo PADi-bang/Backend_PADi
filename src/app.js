@@ -21,4 +21,7 @@ app.use('/api/dashboard', dashboardRoutes);
 const absensiRoutes = require('./routes/absensi');
 app.use('/api/absensi', absensiRoutes);
 
+const jadwalRoutes = require('./routes/jadwal');
+app.use('/api/jadwal', jadwalRoutes);
+
 module.exports = app;

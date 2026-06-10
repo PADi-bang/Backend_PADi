@@ -161,4 +161,25 @@ router.put('/:id/assign', async (req, res) => {
     }
 });
 
+// Toggle status jadwal (isLibur)
+router.put('/:id/toggle', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isLibur } = req.body;
+
+        const updatedJadwal = await prisma.jadwalAbsensi.update({
+            where: { id: parseInt(id) },
+            data: { isLibur: isLibur }
+        });
+
+        res.json({
+            status: 'success',
+            data: updatedJadwal
+        });
+    } catch (error) {
+        console.error("Error PUT /jadwal/toggle:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
 module.exports = router;
