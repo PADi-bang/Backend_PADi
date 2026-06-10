@@ -161,6 +161,34 @@ router.put('/:id/assign', async (req, res) => {
     }
 });
 
+// Unassign kelas dari jadwal
+router.put('/:id/unassign', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { kelasId } = req.body;
+
+        const updateJadwal = await prisma.jadwalAbsensi.update({
+            where: { id: parseInt(id) },
+            data: {
+                kelas: {
+                    disconnect: { id: parseInt(kelasId) }
+                }
+            },
+            include: {
+                kelas: true
+            }
+        });
+
+        res.json({
+            status: 'success',
+            data: updateJadwal
+        });
+    } catch (error) {
+        console.error("Error PUT /jadwal/unassign:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
 // Toggle status jadwal (isLibur)
 router.put('/:id/toggle', async (req, res) => {
     try {
