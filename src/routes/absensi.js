@@ -3,19 +3,36 @@ const router = express.Router();
 const prisma = require('../db'); // Menggunakan instance prisma dari db.js sesuai auth.js
 
 /**
+ * Menormalisasi vektor ke dalam satuan skala yang seragam (L2 Normalization).
+ * @param {number[]} vector - Vektor embedding mentah.
+ * @returns {number[]} Vektor yang telah dinormalisasi.
+ */
+function l2Normalize(vector) {
+  const sum = vector.reduce((acc, val) => acc + val * val, 0);
+  const magnitude = Math.sqrt(sum);
+  if (magnitude === 0) return vector; // Cegah pembagian dengan nol
+  return vector.map(val => val / magnitude);
+}
+
+/**
  * Menghitung jarak Euclidean antara dua vektor (face embedding).
- * Sesuai konsep "Validasi Wajah" di absen.md.
+ * Sesuai konsep "Validasi Wajah" di absen.md dengan tambahan L2 Normalization.
  * @param {number[]} vec1 - Vektor embedding dari Flutter.
  * @param {number[]} vec2 - Vektor embedding dari database.
- * @returns {number} Jarak Euclidean.
+ * @returns {number} Jarak Euclidean yang ternormalisasi.
  */
 function calculateEuclideanDistance(vec1, vec2) {
   if (!vec1 || !vec2 || vec1.length !== vec2.length) {
     throw new Error("Vektor embedding tidak valid atau dimensinya tidak cocok.");
   }
+
+  // [PERBAIKAN] Normalisasikan kedua vektor terlebih dahulu sebelum dihitung selisihnya
+  const norm1 = l2Normalize(vec1);
+  const norm2 = l2Normalize(vec2);
+
   let sum = 0;
-  for (let i = 0; i < vec1.length; i++) {
-    sum += (vec1[i] - vec2[i]) ** 2;
+  for (let i = 0; i < norm1.length; i++) {
+    sum += (norm1[i] - norm2[i]) ** 2;
   }
   return Math.sqrt(sum);
 }
@@ -23,7 +40,7 @@ function calculateEuclideanDistance(vec1, vec2) {
 // POST /api/absensi/masuk
 // Endpoint utama untuk alur absensi sesuai dokumen absen.md
 router.post('/masuk', async (req, res) => {
-  const { userId, faceEmbedding, latitude, longitude } = req.body; // [DIUBAH] Menerima userId
+  const { userId, faceEmbedding, latitude, longitude } = req.body; 
 
   if (!userId || !faceEmbedding || latitude === undefined || longitude === undefined) {
     return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, faceEmbedding, latitude, dan longitude wajib diisi.' });
@@ -31,9 +48,9 @@ router.post('/masuk', async (req, res) => {
 
   try {
     // --- Tahap 1: Ambil data siswa dan sekolah dari Database ---
-    const siswa = await prisma.siswa.findUnique({ // [DIUBAH] Mencari profil siswa berdasarkan userId
+    const siswa = await prisma.siswa.findUnique({ 
       where: { userId: parseInt(userId) },
-      include: { sekolah: true } // Sertakan data sekolah untuk geofencing
+      include: { sekolah: true } 
     });
 
     if (!siswa) {
@@ -47,27 +64,23 @@ router.post('/masuk', async (req, res) => {
     }
 
     // --- Tahap 2: Validasi Wajah (Backend) ---
-    const storedEmbedding = JSON.parse(siswa.faceModel); // Asumsi face_model di DB adalah JSON string array
+    const storedEmbedding = JSON.parse(siswa.faceModel); 
     const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
-    const FACE_RECOGNITION_THRESHOLD = 0.6; // Threshold bisa disesuaikan, semakin kecil semakin ketat
+    const FACE_RECOGNITION_THRESHOLD = 0.6; // Nilai 0.6 sekarang akan menjadi sangat akurat setelah L2 Norm aktif
 
     if (distance > FACE_RECOGNITION_THRESHOLD) {
       return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
     }
 
     // --- Tahap 3: Validasi Lokasi Berlapis (Geofencing di Backend) ---
-    // [DIUBAH] Menggunakan ST_Contains untuk validasi berdasarkan Poligon, bukan radius.
-    // Ini lebih akurat untuk area sekolah yang tidak berbentuk lingkaran.
-    // PRASYARAT: Tabel `sekolah` harus punya kolom `area_sekolah` dengan tipe data `geometry(Polygon, 4326)`.
     const locationCheckResult = await prisma.$queryRaw`
-        SELECT ST_Contains(
+        SELECT ST_Covers(
             area_sekolah, 
-            ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
+            ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
         ) as "isWithinArea"
         FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
     `;
 
-    // [PENAMBAHAN] Validasi hasil query PostGIS untuk mencegah crash jika data sekolah tidak lengkap
     if (!locationCheckResult || !Array.isArray(locationCheckResult) || locationCheckResult.length === 0) {
         console.error("Query Geofencing PostGIS tidak mengembalikan hasil yang valid untuk sekolahId:", siswa.sekolahId);
         return res.status(500).json({ status: 'error', message: 'Gagal memvalidasi lokasi sekolah. Data sekolah mungkin tidak lengkap.' });
@@ -79,6 +92,8 @@ router.post('/masuk', async (req, res) => {
 
     // --- Tahap 4: Validasi Jadwal Absensi ---
     const now = new Date();
+    // Penting: Server diasumsikan berjalan di zona waktu yang sama dengan sekolah (misal: WIB/Asia/Jakarta).
+    // Jika tidak, penentuan 'dayOfWeek' bisa salah di sekitar jam tengah malam.
     const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][now.getDay()];
     
     const jadwal = await prisma.jadwalAbsensi.findFirst({
@@ -110,13 +125,21 @@ router.post('/masuk', async (req, res) => {
     }
 
     // --- Tahap 5: Tentukan Status & Simpan Absensi ke Database ---
-    // Menggabungkan tanggal hari ini dengan jam dari database untuk perbandingan
-    const jamMasukFinishString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${jadwal.jamMasukFinish}`;
-    const jamMasukFinish = new Date(jamMasukFinishString);
-    const status = now <= jamMasukFinish ? 'Hadir' : 'Telat';
+    // [PERBAIKAN ZONA WAKTU] Logika penentuan status 'Telat' dibuat lebih aman.
+    // Ini membuat objek Date untuk batas waktu absensi PADA HARI INI,
+    // menggunakan waktu dari jadwal dan tanggal dari saat ini.
+    const jamMasukFinishDb = new Date(jadwal.jamMasukFinish);
+    const deadlineAbsen = new Date(); // Mengambil tanggal & waktu saat ini
+    
+    // Atur jam, menit, dan detik pada 'deadlineAbsen' agar sesuai dengan jadwal,
+    // dengan mengabaikan tanggal yang tersimpan di database.
+    deadlineAbsen.setHours(jamMasukFinishDb.getHours());
+    deadlineAbsen.setMinutes(jamMasukFinishDb.getMinutes());
+    deadlineAbsen.setSeconds(0); // Detik bisa di-nol-kan untuk toleransi
+    deadlineAbsen.setMilliseconds(0);
 
-    // Format data titik koordinat untuk PostGIS.
-    // CATATAN: Fitur ini memerlukan 'postgis' di dalam previewFeatures di schema.prisma
+    const status = now <= deadlineAbsen ? 'Hadir' : 'Telat';
+
     const koordinatMasukPoint = { type: 'Point', coordinates: [longitude, latitude] };
 
     const absensiBaru = await prisma.absensi.create({
@@ -126,7 +149,6 @@ router.post('/masuk', async (req, res) => {
             tanggal: now,
             jamMasuk: now,
             koordinatMasuk: koordinatMasukPoint,
-            // fotoMasuk: 'URL/path_to_photo', // Perlu logic upload file terpisah
             status: status,
             keterangan: `Absen masuk via aplikasi mobile terdeteksi ${status}.`
         }
