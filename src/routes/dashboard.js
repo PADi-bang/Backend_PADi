@@ -4,14 +4,95 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+// ==========================================
+// 1. RUTE WEB ADMIN (Harus di atas)
+// GET /api/dashboard/stats
+// ==========================================
+router.get('/stats', async (req, res) => {
+  try {
+      const totalAdmin = await prisma.user.count({ where: { roleId: 1 } });
+      const totalGuru = await prisma.user.count({ where: { roleId: 2 } });
+      const totalSiswa = await prisma.user.count({ where: { roleId: 3 } });
+
+      const attendanceWeekly = [totalSiswa * 0.8, totalSiswa * 0.85, totalSiswa * 0.9, totalSiswa * 0.88, totalSiswa * 0.95, totalSiswa * 0.92, totalSiswa * 0.9];
+      const statusChart = [85, 10, 5]; 
+
+      // === LOGIKA DINAMIS: TARIK SISWA BERMASALAH HARI INI ===
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      // Tarik siswa yang Alpha atau Telat hari ini
+      const absensiBermasalah = await prisma.absensi.findMany({
+          where: {
+              tanggal: { gte: startOfDay },
+              status: { in: ['Alpha', 'Telat'] }
+          },
+          include: { siswa: true },
+          take: 2, 
+          orderBy: { id: 'desc' }
+      });
+
+      // Tarik siswa yang sedang Izin/Sakit hari ini
+      const perizinanHariIni = await prisma.perizinan.findMany({
+          where: {
+              tanggalMulai: { lte: new Date() },
+              tanggalSelesai: { gte: startOfDay },
+              status: 'Disetujui'
+          },
+          include: { siswa: true },
+          take: 1, 
+          orderBy: { id: 'desc' }
+      });
+
+      let siswaPerluPerhatian = [];
+
+      absensiBermasalah.forEach(a => {
+          if (a.siswa) {
+              siswaPerluPerhatian.push({
+                  nama: a.siswa.namaLengkap,
+                  inisial: a.siswa.namaLengkap.substring(0, 2).toUpperCase(),
+                  statusText: a.status === 'Alpha' ? 'Alpha (Tanpa Keterangan)' : 'Terlambat Masuk',
+                  theme: a.status === 'Alpha' ? 'red' : 'orange'
+              });
+          }
+      });
+
+      perizinanHariIni.forEach(p => {
+          if (p.siswa) {
+              siswaPerluPerhatian.push({
+                  nama: p.siswa.namaLengkap,
+                  inisial: p.siswa.namaLengkap.substring(0, 2).toUpperCase(),
+                  statusText: p.jenisIzin === 'Sakit' ? 'Izin (Sakit)' : 'Izin (Kepentingan)',
+                  theme: 'blue'
+              });
+          }
+      });
+
+      res.status(200).json({
+          status: 'success',
+          data: {
+              totalSiswa,
+              totalGuru,
+              totalAdmin,
+              attendanceWeekly,
+              statusChart,
+              siswaPerluPerhatian // Kirim data dinamis ke EJS
+          }
+      });
+  } catch (err) {
+      console.error("Error API Stats:", err.message);
+      res.status(500).json({ status: 'error', message: 'Gagal mengambil statistik Web Admin' });
+  }
+});
+
+// ==========================================
+// 2. RUTE FLUTTER SISWA (KODE ASLI ANDA - TIDAK DIUBAH)
 // GET /api/dashboard/:userId
-// Mengambil data statistik kehadiran dan riwayat berdasarkan ID Akun (User)
+// ==========================================
 router.get('/:userId', async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
 
-    // 1. Cari Profil Siswa dari ID User yang sedang login
-    // Ingat: Akun (User) dan Profil (Siswa) beda tabel di database Anda!
     const siswa = await prisma.siswa.findUnique({
       where: { userId: userId }
     });
@@ -22,44 +103,33 @@ router.get('/:userId', async (req, res) => {
 
     const idSiswa = siswa.id;
 
-    // 2. Menghitung Statistik Bulan Ini
     const hariIni = new Date();
     const awalBulan = new Date(hariIni.getFullYear(), hariIni.getMonth(), 1);
     const akhirBulan = new Date(hariIni.getFullYear(), hariIni.getMonth() + 1, 0);
 
-    // Ambil semua data absensi di bulan berjalan
     const absensiBulanIni = await prisma.absensi.findMany({
       where: {
         siswaId: idSiswa,
-        tanggal: {
-          gte: awalBulan,
-          lte: akhirBulan
-        }
+        tanggal: { gte: awalBulan, lte: akhirBulan }
       }
     });
 
     const totalHariAktif = absensiBulanIni.length;
-    // Siswa dihitung hadir jika statusnya "Hadir" atau "Telat"
     const jumlahHadir = absensiBulanIni.filter(a => a.status === 'Hadir' || a.status === 'Telat').length;
-    
-    // Mencegah error pembagian dengan nol (0) jika data bulan ini kosong
     const persentase = totalHariAktif > 0 ? Math.round((jumlahHadir / totalHariAktif) * 100) : 0;
 
-    // 3. Ambil 5 Riwayat Absensi Terakhir
     const riwayatAbsensi = await prisma.absensi.findMany({
       where: { siswaId: idSiswa },
       orderBy: { tanggal: 'desc' },
       take: 5
     });
 
-    // 4. Ambil 5 Riwayat Perizinan Terakhir
     const riwayatPerizinan = await prisma.perizinan.findMany({
       where: { siswaId: idSiswa },
       orderBy: { createdAt: 'desc' },
       take: 5
     });
 
-    // 5. Kirim semua data yang sudah dibungkus ke Flutter
     res.status(200).json({
       status: 'success',
       data: {

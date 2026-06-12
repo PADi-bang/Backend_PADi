@@ -11,6 +11,7 @@ app.use(cors());
 app.use(express.json());
 app.use('/api/guru', guruRoutes);
 app.use(express.urlencoded({ extended: true }));
+
 // --- Pendaftaran Rute ---
 // Impor file-file rute Anda di sini
 const authRoutes = require('./routes/auth');
@@ -23,5 +24,9 @@ app.use('/api/absensi', absensiRoutes);
 
 const jadwalRoutes = require('./routes/jadwal');
 app.use('/api/jadwal', jadwalRoutes);
+
+// ---> TAMBAHAN RUTE ADMIN UNTUK FITUR CRUD & SEARCH <---
+const adminRoutes = require('./routes/admin');
+app.use('/api/admin', adminRoutes);
 
 module.exports = app;
