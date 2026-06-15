@@ -9,6 +9,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
   extensions = [postgis]
 }
 
@@ -148,6 +149,7 @@ model MasterKelas {
   namaKelas      String           @map("nama_kelas")
   sekolah        Sekolah          @relation(fields: [sekolahId], references: [id])
   enrolmentKelas EnrolmentKelas[]
+  jadwalAbsensi  JadwalAbsensi[]
 
   @@map("master_kelas")
 }
@@ -224,13 +226,14 @@ model JadwalAbsensi {
   sekolahId      Int       @map("id_sekolah")
   namaJadwal     String    @map("nama_jadwal")
   hari           String
-  tanggal        DateTime  @db.Date
+  tanggal        DateTime? @db.Date
   jamMasukStart  DateTime  @map("jam_masuk_start") @db.Time
   jamMasukFinish DateTime  @map("jam_masuk_finish") @db.Time
   jamPulang      DateTime  @map("jam_pulang") @db.Time
   isLibur        Boolean   @map("is_libur")
   sekolah        Sekolah   @relation(fields: [sekolahId], references: [id])
   absensi        Absensi[]
+  kelas          MasterKelas[]
 
   @@map("jadwal_absensi")
 }
