@@ -83,19 +83,35 @@ async function main() {
     console.log('✔️ Akun Siswa Testing (tejo) berhasil dibuat.');
   }
 
-  // 5. Membuat Jadwal Absensi Dummy
-  const jadwal = await prisma.jadwalAbsensi.create({
-    data: {
-      sekolahId: 1,
-      namaJadwal: 'Reguler Pagi',
-      hari: 'Senin-Jumat',
-      tanggal: new Date(),
-      jamMasukStart: new Date('2026-05-24T06:00:00Z'),
-      jamMasukFinish: new Date('2026-05-24T07:15:00Z'),
-      jamPulang: new Date('2026-05-24T15:00:00Z'),
-      isLibur: false
-    }
-  });
+  // 5. Membuat Jadwal Absensi Dummy untuk setiap hari kerja
+  // PERBAIKAN: Jadwal dipecah per hari agar query di backend (absensi.js) bisa menemukan jadwal aktif.
+  console.log('✔️ Menyiapkan jadwal absensi harian (Senin-Jumat)...');
+  const hariKerja = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+  const jadwalDibuat = [];
+
+  // PERBAIKAN: Hapus data absensi terlebih dahulu sebelum menghapus jadwal.
+  // Ini untuk mencegah error "foreign key constraint" (absensi -> jadwal) jika seeder dijalankan lebih dari sekali.
+  await prisma.absensi.deleteMany({ where: { siswa: { sekolahId: 1 } } });
+  await prisma.jadwalAbsensi.deleteMany({ where: { sekolahId: 1 } });
+
+  for (const hari of hariKerja) {
+    const jadwalBaru = await prisma.jadwalAbsensi.create({
+      data: {
+        sekolahId: 1,
+        namaJadwal: `Reguler Pagi - ${hari}`,
+        hari: hari, // Dipecah per hari, bukan lagi 'Senin-Jumat'
+        tanggal: new Date(), // [PERBAIKAN] Tambahkan field tanggal yang wajib diisi sesuai skema
+        jamMasukStart: new Date('2026-01-01T06:00:00Z'), // Gunakan tanggal netral, hanya jam yang penting
+        jamMasukFinish: new Date('2026-01-01T07:15:00Z'),
+        jamPulang: new Date('2026-01-01T15:00:00Z'),
+        isLibur: false
+      }
+    });
+    jadwalDibuat.push(jadwalBaru);
+  }
+
+  // Untuk seeding riwayat, kita cukup gunakan salah satu ID jadwal yang sudah dibuat (misal: jadwal hari Senin).
+  const jadwal = jadwalDibuat[0];
 
   // 6. FACTORY UTAMA: Membuat 15 Siswa Acak beserta Riwayatnya
   console.log('⚙️ Sedang mencetak 15 Siswa acak beserta riwayat absensi dan izin...');
