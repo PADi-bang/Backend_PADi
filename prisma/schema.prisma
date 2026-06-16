@@ -158,6 +158,7 @@ model MasterAngkatan {
   id            Int              @id @default(autoincrement()) @map("id_angkatan")
   sekolahId     Int              @map("id_sekolah")
   nomorAngkatan String           @map("nomor_angkatan")
+  isActive      Boolean          @default(true) @map("is_active")
   sekolah       Sekolah          @relation(fields: [sekolahId], references: [id])
   enrolmentKelas EnrolmentKelas[]
 
@@ -285,4 +286,13 @@ model Notifikasi {
   user      User           @relation(fields: [userId], references: [id])
 
   @@map("notifikasi")
+}
+
+model Pengaturan {
+  id        Int      @id @default(autoincrement()) @map("id_pengaturan")
+  kunci     String   @unique
+  nilai     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("pengaturan")
 }
