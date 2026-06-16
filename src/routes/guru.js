@@ -21,19 +21,24 @@ router.get('/dashboard/:userId', async (req, res) => {
       include: { siswa: true } 
     });
 
-    // 3. Ambil Rekap Absensi Siswa HARI INI (Semua Siswa Terdaftar)
-    const hariIni = new Date();
-    hariIni.setHours(0, 0, 0, 0); 
-    const besok = new Date(hariIni);
-    besok.setDate(besok.getDate() + 1);
+    // 3. Ambil Rekap Absensi Siswa HARI INI
+    // [PERBAIKAN] Menggunakan zona waktu WIB untuk konsistensi data
+    const nowWIBString = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+    const nowWIB = new Date(nowWIBString);
 
-    // Tarik SEMUA siswa untuk ditampilkan di rekap
-    const semuaSiswa = await prisma.siswa.findMany();
+    const year = nowWIB.getFullYear();
+    const month = String(nowWIB.getMonth() + 1).padStart(2, '0');
+    const day = String(nowWIB.getDate()).padStart(2, '0');
+    
+    const todayStartWIB = new Date(`${year}-${month}-${day}T00:00:00+07:00`);
+    const tomorrowStartWIB = new Date(todayStartWIB);
+    tomorrowStartWIB.setDate(tomorrowStartWIB.getDate() + 1);
 
     const absensiHariIni = await prisma.absensi.findMany({
       where: {
-        tanggal: { gte: hariIni, lt: besok }
-      }
+        tanggal: { gte: todayStartWIB, lt: tomorrowStartWIB }
+      },
+      include: { siswa: true } // Tarik identitas siswanya
     });
 
     // Gabungkan data: Jika siswa tidak ada di absensiHariIni, berarti dia Alpha

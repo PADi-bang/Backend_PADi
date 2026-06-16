@@ -93,10 +93,11 @@ router.post('/masuk', async (req, res) => {
     }
 
     // --- Tahap 4: Validasi Jadwal Absensi ---
-    // Mengunci waktu saat ini ke WIB (Asia/Jakarta) untuk menghindari bug shift hari di server UTC
-    const now = new Date(); // Waktu UTC saat ini, untuk disimpan ke DB
-    const nowWIBString = now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
-    const nowWIB = new Date(nowWIBString);
+    const now = new Date(); // Waktu absolute untuk disimpan ke DB
+    
+    // [PERBAIKAN] Dapatkan waktu WIB murni tanpa string parsing (anti-bug Invalid Date)
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const nowWIB = new Date(utcTime + (3600000 * 7)); // Geser +7 jam untuk WIB
     
     const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][nowWIB.getDay()];
     
@@ -112,89 +113,71 @@ router.post('/masuk', async (req, res) => {
         return res.status(404).json({ status: 'error', message: `Tidak ada jadwal absensi aktif untuk hari ${dayOfWeek}.` });
     }
 
-    // Buat batas awal hari ini (00:00:00 WIB) yang aman untuk server UTC
+    // Buat batas awal dan akhir hari ini secara matematis
     const year = nowWIB.getFullYear();
     const month = String(nowWIB.getMonth() + 1).padStart(2, '0');
     const day = String(nowWIB.getDate()).padStart(2, '0');
-    // ISO string dengan offset +07:00 (WIB)
-    const todayStart = new Date(`${year}-${month}-${day}T00:00:00+07:00`); 
+    
+    const todayStart = new Date(`${year}-${month}-${day}T00:00:00+07:00`);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    // 1. CEK BATAS WAKTU YANG DIBACA SERVER
+    console.log(`\n[DEBUG] Mencari absen antara: ${todayStart.toISOString()} s/d ${tomorrowStart.toISOString()}`);
 
     const existingAbsensi = await prisma.absensi.findFirst({
         where: {
             siswaId: siswa.id,
-            tanggal: { gte: todayStart }, // `tanggal` di DB adalah UTC, `todayStart` juga dikonversi ke UTC oleh Prisma
+            tanggal: {
+                gte: todayStart, 
+                lt: tomorrowStart 
+            },
             jamMasuk: { not: null }
         }
     });
+
+    // 2. CEK DATA APA YANG SEBENARNYA DITEMUKAN PRISMA
+    console.log("[DEBUG] Data yang memblokir absen:", existingAbsensi);
 
     if (existingAbsensi) {
         return res.status(409).json({ status: 'error', message: 'Anda sudah melakukan absensi masuk hari ini.' });
     }
 
-    // --- Tahap 5: Tentukan Status & Simpan Absensi ke Database ---
-    // [SOLUSI] Konversi ke Menit Absolut untuk perbandingan waktu yang aman dari zona waktu.
-
-    // 1. Gunakan `nowWIB` dari Tahap 4 untuk mendapatkan jam dan menit
+    // --- Tahap 5: Tentukan Status & Simpan Absensi ---
     const jamSekarang = nowWIB.getHours();
     const menitSekarang = nowWIB.getMinutes();
-    
-    // Ubah jadi total menit dari tengah malam (misal 07:15 = (7 * 60) + 15 = 435)
     const totalMenitSekarang = (jamSekarang * 60) + menitSekarang;
 
-    // 2. Ekstrak jadwal batas dari database Prisma
     const jamMasukFinishDb = new Date(jadwal.jamMasukFinish);
-    
-    // CATATAN: Gunakan getUTCHours() karena Prisma membaca tipe Time dari DB sebagai UTC.
-    // Jam 07:00:00 di DB akan menjadi objek Date dengan waktu 07:00:00 UTC.
     const jamBatas = jamMasukFinishDb.getUTCHours(); 
     const menitBatas = jamMasukFinishDb.getUTCMinutes();
-    
     const totalMenitBatas = (jamBatas * 60) + menitBatas;
 
-    // 3. Bandingkan nilainya secara matematis murni
     const status = totalMenitSekarang <= totalMenitBatas ? 'Hadir' : 'Telat';
 
-    let keterangan;
+    let keterangan = '-';
     if (status === 'Telat') {
       const menitTelat = totalMenitSekarang - totalMenitBatas;
       if (menitTelat >= 60) {
         const jam = Math.floor(menitTelat / 60);
         const menit = menitTelat % 60;
-        keterangan = `Telat ${jam} jam`;
-        if (menit > 0) {
-          keterangan += ` ${menit} menit`;
-        }
+        keterangan = `Telat ${jam} jam${menit > 0 ? ` ${menit} menit` : ''}`;
       } else {
         keterangan = `Telat ${menitTelat} menit`;
       }
-    } else {
-      keterangan = '-';
     }
     
-    // 4. Lanjutkan eksekusi insert geospasial
+    // [PERBAIKAN] Gunakan toISOString() agar sinkron dengan cara Prisma membaca database
     const result = await prisma.$queryRaw(Prisma.sql`
       INSERT INTO absensi (id_siswa, id_jadwal, tanggal, jam_masuk, status, keterangan, koordinat_masuk, foto_masuk)
-      VALUES (${siswa.id}, ${jadwal.id}, ${now}, ${now}, ${status}::"AbsensiStatus", ${keterangan}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326), ${fotoMasuk})
+      VALUES (${siswa.id}, ${jadwal.id}, ${now.toISOString()}::timestamp, ${now.toISOString()}::timestamp, ${status}::"AbsensiStatus", ${keterangan}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326), ${fotoMasuk})
       RETURNING
-        id_absensi,
-        id_siswa,
-        id_jadwal,
-        tanggal,
-        jam_masuk,
-        jam_pulang,
-        status,
-        keterangan,
-        foto_masuk,
-        foto_pulang,
+        id_absensi, id_siswa, id_jadwal, tanggal, jam_masuk, jam_pulang, status, keterangan, foto_masuk, foto_pulang,
         ST_AsGeoJSON(koordinat_masuk) as koordinat_masuk;
     `);
 
     const absensiBaru = result[0];
-    res.status(201).json({
-      status: 'success',
-      message: `Absensi berhasil! Status Anda: ${status}`,
-      data: absensiBaru
-    });
+    res.status(201).json({ status: 'success', message: `Absensi berhasil! Status Anda: ${status}`, data: absensiBaru });
 
   } catch (err) {
     console.error("Error pada alur absensi:", err);
@@ -254,22 +237,25 @@ router.post('/pulang', async (req, res) => {
 
     // --- INI BAGIAN YANG BERBEDA DARI ABSEN MASUK ---
     // 5. Cari data absensi masuk hari ini yang belum ada jam pulangnya
+    const now = new Date();
     
-    // Mengunci waktu ke WIB untuk mencari data hari ini, menghindari bug shift hari di server UTC
-    const nowWIBString = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
-    const nowWIB = new Date(nowWIBString);
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const nowWIB = new Date(utcTime + (3600000 * 7));
     
     const year = nowWIB.getFullYear();
     const month = String(nowWIB.getMonth() + 1).padStart(2, '0');
     const day = String(nowWIB.getDate()).padStart(2, '0');
+    
     const todayStart = new Date(`${year}-${month}-${day}T00:00:00+07:00`);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
     const absensiHariIni = await prisma.absensi.findFirst({
         where: {
             siswaId: siswa.id,
-            tanggal: { gte: todayStart }, // `tanggal` di DB adalah UTC, `todayStart` juga dikonversi ke UTC oleh Prisma
-            jamMasuk: { not: null }, // Pastikan sudah absen masuk
-            jamPulang: null          // Dan belum absen pulang
+            tanggal: { gte: todayStart, lt: tomorrowStart },
+            jamMasuk: { not: null },
+            jamPulang: null
         }
     });
 
@@ -278,27 +264,20 @@ router.post('/pulang', async (req, res) => {
     }
 
     // 6. Update data absensi dengan jam pulang, foto, dan koordinat
-    const now = new Date();
     const result = await prisma.$queryRaw(Prisma.sql`
       UPDATE absensi
       SET 
-        jam_pulang = ${now},
+        jam_pulang = ${now.toISOString()}::timestamp,
         foto_pulang = ${fotoPulang},
         koordinat_pulang = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
       WHERE id_absensi = ${absensiHariIni.id}
       RETURNING
-        id_absensi,
-        jam_pulang,
-        foto_pulang,
+        id_absensi, jam_pulang, foto_pulang,
         ST_AsGeoJSON(koordinat_pulang) as koordinat_pulang;
     `);
 
     const absensiUpdated = result[0];
-    res.status(200).json({
-      status: 'success',
-      message: 'Absensi pulang berhasil!',
-      data: absensiUpdated
-    });
+    res.status(200).json({ status: 'success', message: 'Absensi pulang berhasil!', data: absensiUpdated });
 
   } catch (err) {
     console.error("Error pada alur absensi pulang:", err);
