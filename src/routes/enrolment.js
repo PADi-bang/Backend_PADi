@@ -281,17 +281,26 @@ router.post('/:id/siswa/upload', upload.single('fileExcel'), async (req, res) =>
                 let siswa = await prisma.siswa.findUnique({ where: { nis } });
                 
                 if (!siswa) {
-                    // Auto-create siswa
-                    siswa = await prisma.siswa.create({
+                    // Auto-create user and siswa
+                    const bcrypt = require('bcryptjs');
+                    const hashedPassword = await bcrypt.hash(nis, 10);
+                    const newUser = await prisma.user.create({
                         data: {
-                            nis,
-                            namaLengkap: nama,
-                            jenisKelamin: '-',
-                            tempatLahir: '-',
-                            tanggalLahir: new Date(),
-                            alamat: '-'
-                        }
+                            username: nis,
+                            email: `${nis}@siswa.local`,
+                            password: hashedPassword,
+                            roleId: 3, // Siswa Role ID
+                            siswa: {
+                                create: {
+                                    nis,
+                                    namaLengkap: nama,
+                                    sekolahId: 1
+                                }
+                            }
+                        },
+                        include: { siswa: true }
                     });
+                    siswa = newUser.siswa;
                 }
 
                 // Cek apakah sudah tergabung di kelas ini

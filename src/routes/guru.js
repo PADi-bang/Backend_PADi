@@ -35,23 +35,16 @@ router.get('/dashboard/:userId', async (req, res) => {
         tanggal: { gte: todayStartWIB, lt: tomorrowStartWIB }
       },
       include: { siswa: true } // Tarik identitas siswanya
-    const hariIni = new Date();
-    hariIni.setHours(0, 0, 0, 0); 
-    const besok = new Date(hariIni);
-    besok.setDate(besok.getDate() + 1);
+    });
 
     const semuaSiswa = await prisma.siswa.findMany();
-
-    const absensiHariIni = await prisma.absensi.findMany({
-      where: { tanggal: { gte: hariIni, lt: besok } }
-    });
 
     // [PERBAIKAN] Logika filter tanggal diperlebar agar tidak meleset karena zona waktu
     const izinHariIni = await prisma.perizinan.findMany({
         where: {
             status: 'Disetujui',
-            tanggalMulai: { lt: besok }, // Izin dimulai sebelum besok
-            tanggalSelesai: { gte: hariIni } // Izin selesai setelah hari ini dimulai
+            tanggalMulai: { lt: tomorrowStartWIB }, // Izin dimulai sebelum besok
+            tanggalSelesai: { gte: todayStartWIB } // Izin selesai setelah hari ini dimulai
         }
     });
 
