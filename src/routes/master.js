@@ -62,6 +62,14 @@ router.post('/pengaturan', async (req, res) => {
                 });
             }
         }
+        
+        // Sinkronisasi semester TA aktif secara real-time
+        const semesterAktif = await getSemesterAktif();
+        await prisma.masterTahunAkademik.updateMany({
+            where: { isActive: true },
+            data: { semester: semesterAktif }
+        });
+
         res.status(200).json({ status: 'success' });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Gagal menyimpan pengaturan' });
@@ -75,7 +83,7 @@ router.get('/kelas', async (req, res) => {
     try {
         const kelas = await prisma.masterKelas.findMany({
             include: { sekolah: true },
-            orderBy: { id: 'asc' }
+            orderBy: { namaKelas: 'asc' }
         });
         res.status(200).json({ status: 'success', data: kelas });
     } catch (error) {
@@ -84,8 +92,9 @@ router.get('/kelas', async (req, res) => {
 });
 
 router.post('/kelas', async (req, res) => {
-    const { namaKelas, sekolahId } = req.body;
+    const { prefix, namaKelasAkhiran, sekolahId } = req.body;
     try {
+        const namaKelas = `${prefix} ${namaKelasAkhiran}`.trim();
         // Cek duplikasi
         const existing = await prisma.masterKelas.findFirst({
             where: { namaKelas: { equals: namaKelas, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
@@ -100,6 +109,24 @@ router.post('/kelas', async (req, res) => {
                 sekolahId: parseInt(sekolahId) || 1 
             }
         });
+
+        // Auto-enrolment jika prefix kelas (Tingkat) sudah diatur
+        const existingEnrolmentInSamePrefix = await prisma.enrolmentKelas.findFirst({
+            where: { masterKelas: { namaKelas: { startsWith: prefix + ' ' } } }
+        });
+
+        if (existingEnrolmentInSamePrefix) {
+            await prisma.enrolmentKelas.create({
+                data: {
+                    sekolahId: parseInt(sekolahId) || 1,
+                    kelasId: newKelas.id,
+                    angkatanId: existingEnrolmentInSamePrefix.angkatanId,
+                    tahunAkademikId: existingEnrolmentInSamePrefix.tahunAkademikId,
+                    keterangan: ''
+                }
+            });
+        }
+
         res.status(201).json({ status: 'success', data: newKelas });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Gagal menambah master kelas' });
@@ -222,10 +249,11 @@ router.post('/tahun-akademik', async (req, res) => {
         
         let newIsActive = isActive === 'true' || isActive === true;
         if (newIsActive) {
-            const activeCount = await prisma.masterTahunAkademik.count({ where: { isActive: true, sekolahId: parseInt(sekolahId) || 1 } });
-            if (activeCount >= 4) {
-                return res.status(400).json({ status: 'error', message: 'Maksimal_hanya_4_tahun_akademik_aktif' });
-            }
+            // Nonaktifkan semua TA lainnya
+            await prisma.masterTahunAkademik.updateMany({
+                where: { sekolahId: parseInt(sekolahId) || 1 },
+                data: { isActive: false }
+            });
         }
 
         const newTa = await prisma.masterTahunAkademik.create({
@@ -247,16 +275,26 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
     try {
         const ta = await prisma.masterTahunAkademik.findUnique({ where: { id } });
         if(ta) {
-            if (!ta.isActive) {
-                const activeCount = await prisma.masterTahunAkademik.count({ where: { isActive: true, sekolahId: ta.sekolahId } });
-                if (activeCount >= 4) {
-                    return res.status(400).json({ status: 'error', message: 'Maksimal_hanya_4_tahun_akademik_aktif' });
-                }
+            const newIsActive = !ta.isActive;
+            if (newIsActive) {
+                // Nonaktifkan semua TA lainnya
+                await prisma.masterTahunAkademik.updateMany({
+                    where: { sekolahId: ta.sekolahId },
+                    data: { isActive: false }
+                });
             }
             await prisma.masterTahunAkademik.update({
                 where: { id },
-                data: { isActive: !ta.isActive }
+                data: { isActive: newIsActive }
             });
+
+            // Auto-update TA pada semua kelas di Enrolment
+            if (newIsActive) {
+                await prisma.enrolmentKelas.updateMany({
+                    where: { sekolahId: ta.sekolahId },
+                    data: { tahunAkademikId: id }
+                });
+            }
         }
         res.status(200).json({ status: 'success' });
     } catch (error) {
