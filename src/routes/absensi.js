@@ -75,22 +75,39 @@ router.post('/masuk', async (req, res) => {
     const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
     const nowWIB = new Date(utcTime + (3600000 * 7)); 
     
-    const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][nowWIB.getDay()];
-    
-    const jadwal = await prisma.jadwalAbsensi.findFirst({
-        where: { sekolahId: siswa.sekolahId, hari: dayOfWeek, isLibur: false }
-    });
-
-    if (!jadwal) return res.status(404).json({ status: 'error', message: `Tidak ada jadwal aktif untuk hari ${dayOfWeek}.` });
-
     // Membangun batas deteksi hari ini murni berdasarkan kalender WIB
     const year = nowWIB.getFullYear();
     const month = String(nowWIB.getMonth() + 1).padStart(2, '0');
     const day = String(nowWIB.getDate()).padStart(2, '0');
-    
+
     const todayStart = new Date(`${year}-${month}-${day}T00:00:00+07:00`);
     const tomorrowStart = new Date(todayStart);
     tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    // Tahap 4: Validasi Jadwal Absensi
+    const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][nowWIB.getDay()];
+    // 1. Cari jadwal khusus untuk tanggal hari ini terlebih dahulu
+    let jadwal = await prisma.jadwalAbsensi.findFirst({
+        where: {
+            sekolahId: siswa.sekolahId,
+            tanggal: { gte: todayStart, lt: tomorrowStart },
+            isLibur: false
+        }
+    });
+
+    // 2. Jika tidak ada jadwal khusus hari ini, gunakan jadwal reguler (berdasarkan hari, tanggal = null)
+    if (!jadwal) {
+        jadwal = await prisma.jadwalAbsensi.findFirst({
+            where: {
+                sekolahId: siswa.sekolahId,
+                hari: dayOfWeek,
+                tanggal: null, // Memastikan ini adalah jadwal berulang
+                isLibur: false
+            }
+        });
+    }
+
+    if (!jadwal) return res.status(404).json({ status: 'error', message: `Tidak ada jadwal aktif untuk hari ${dayOfWeek}.` });
 
     const existingAbsensi = await prisma.absensi.findFirst({
         where: {
@@ -200,7 +217,7 @@ router.post('/pulang', async (req, res) => {
     const tanggalWIBString = `${year}-${month}-${day}`;
 
     const cariAbsensi = await prisma.$queryRaw(Prisma.sql`
-        SELECT id_absensi as id 
+        SELECT id_absensi as id, id_jadwal
         FROM absensi 
         WHERE id_siswa = ${siswa.id} 
           AND tanggal = ${tanggalWIBString}::date 
@@ -214,6 +231,38 @@ router.post('/pulang', async (req, res) => {
     }
 
     const absensiHariIni = cariAbsensi[0];
+
+    // --- [BARU] VALIDASI BELUM WAKTUNYA PULANG ---
+    // 1. Ambil data jadwal absensi yang digunakan saat absen masuk pagi tadi
+    const jadwal = await prisma.jadwalAbsensi.findUnique({
+        where: { id: absensiHariIni.id_jadwal } // Kita ambil ID jadwal dari data absen masuk
+    });
+
+    if (jadwal && jadwal.jamPulang) {
+        // Konversi jam pulang dari database ke total menit (Sama seperti logika absen masuk)
+        const jamPulangDb = new Date(jadwal.jamPulang);
+        const batasJamPulang = jamPulangDb.getUTCHours(); 
+        const batasMenitPulang = jamPulangDb.getUTCMinutes();
+        const totalMenitBatasPulang = (batasJamPulang * 60) + batasMenitPulang;
+
+        // Hitung waktu sekarang
+        const jamSekarang = nowWIB.getHours();
+        const menitSekarang = nowWIB.getMinutes();
+        const totalMenitSekarang = (jamSekarang * 60) + menitSekarang;
+
+        // Jika waktu sekarang masih kurang dari batas jam pulang, tolak!
+        if (totalMenitSekarang < totalMenitBatasPulang) {
+            // Opsional: Buat pesan yang rapi (misal: "Belum waktunya pulang. Jadwal pulang: 15:00")
+            const strBatasJam = String(batasJamPulang).padStart(2, '0');
+            const strBatasMenit = String(batasMenitPulang).padStart(2, '0');
+            
+            return res.status(403).json({ 
+                status: 'error', 
+                message: `Belum waktunya pulang. Jadwal kepulangan hari ini adalah pukul ${strBatasJam}:${strBatasMenit} WIB.` 
+            });
+        }
+    }
+    // --- [SELESAI VALIDASI WAKTU PULANG] ---
 
     // Merakit string jam kepulangan statis (WIB)
     const jamSekarang = nowWIB.getHours();
