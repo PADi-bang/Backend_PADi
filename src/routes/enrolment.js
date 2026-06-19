@@ -173,24 +173,6 @@ router.post('/edit-keterangan/:kelasId', async (req, res) => {
 // DETAIL ENROLMENT KELAS (SISWA & GURU)
 // ==========================================
 
-// GET Template Excel Siswa
-router.get('/template-excel', (req, res) => {
-    try {
-        const workbook = xlsx.utils.book_new();
-        const worksheet = xlsx.utils.json_to_sheet([
-            { 'NIS': '123456', 'NAMA LENGKAP': 'Budi Santoso' },
-            { 'NIS': '654321', 'NAMA LENGKAP': 'Siti Aminah' }
-        ]);
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'Siswa');
-        const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-        
-        res.setHeader('Content-Disposition', 'attachment; filename="Template_Upload_Siswa.xlsx"');
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.send(buffer);
-    } catch (error) {
-        res.status(500).json({ status: 'error', message: 'Gagal membuat template excel' });
-    }
-});
 
 // 5. Detail Enrolment Kelas (Daftar Siswa & Guru di dalamnya)
 router.get('/:id/detail', async (req, res) => {
@@ -255,79 +237,7 @@ router.post('/:id/siswa', async (req, res) => {
     }
 });
 
-// Upload Excel Siswa
-router.post('/:id/siswa/upload', upload.single('fileExcel'), async (req, res) => {
-    const enrolmentKelasId = parseInt(req.params.id);
-    if (!req.file) {
-        return res.status(400).json({ status: 'error', message: 'File tidak ditemukan' });
-    }
 
-    try {
-        const workbook = xlsx.readFile(req.file.path);
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(sheet);
-        
-        for (const row of data) {
-            // Coba ambil NIS dan NAMA dari beberapa kemungkinan key header
-            let nis = row['NIS'] || row['nis'] || row['Nis'];
-            let nama = row['NAMA LENGKAP'] || row['Nama Lengkap'] || row['nama'] || row['NAMA'];
-            
-            if (nis && nama) {
-                nis = nis.toString().trim();
-                nama = nama.toString().trim();
-                
-                // Cari apakah siswa sudah ada di master siswa
-                let siswa = await prisma.siswa.findUnique({ where: { nis } });
-                
-                if (!siswa) {
-                    // Auto-create user and siswa
-                    const bcrypt = require('bcryptjs');
-                    const hashedPassword = await bcrypt.hash(nis, 10);
-                    const newUser = await prisma.user.create({
-                        data: {
-                            username: nis,
-                            email: `${nis}@siswa.local`,
-                            password: hashedPassword,
-                            roleId: 3, // Siswa Role ID
-                            siswa: {
-                                create: {
-                                    nis,
-                                    namaLengkap: nama,
-                                    sekolahId: 1
-                                }
-                            }
-                        },
-                        include: { siswa: true }
-                    });
-                    siswa = newUser.siswa;
-                }
-
-                // Cek apakah sudah tergabung di kelas ini
-                const existingEnrolment = await prisma.enrolmentSiswa.findFirst({
-                    where: { enrolmentKelasId, siswaId: siswa.id }
-                });
-
-                if (!existingEnrolment) {
-                    await prisma.enrolmentSiswa.create({
-                        data: {
-                            enrolmentKelasId,
-                            siswaId: siswa.id,
-                            isActive: true
-                        }
-                    });
-                }
-            }
-        }
-        
-        fs.unlinkSync(req.file.path); // Hapus file temporary
-        res.status(200).json({ status: 'success' });
-    } catch (error) {
-        if(req.file) fs.unlinkSync(req.file.path);
-        console.error(error);
-        res.status(500).json({ status: 'error', message: 'Gagal memproses file Excel' });
-    }
-});
 
 // 7. Hapus Siswa dari Kelas
 router.delete('/:id/siswa/:siswaId', async (req, res) => {
@@ -377,6 +287,112 @@ router.delete('/:id/guru/:guruId', async (req, res) => {
         res.status(200).json({ status: 'success' });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Gagal menghapus guru dari kelas' });
+    }
+});
+
+// 10. Proses Mutasi Status Siswa (Naik Kelas, Lulus, Cuti)
+router.post('/:id/bulk-status', async (req, res) => {
+    const enrolmentId = parseInt(req.params.id);
+    const { updates } = req.body; // array of { siswaId, status }
+
+    try {
+        const currentEnrolment = await prisma.enrolmentKelas.findUnique({
+            where: { id: enrolmentId },
+            include: { masterKelas: true, masterTahunAkademik: true, masterAngkatan: true }
+        });
+
+        if (!currentEnrolment) {
+            return res.status(404).json({ status: 'error', message: 'Kelas tidak ditemukan' });
+        }
+
+        // Kalkulasi TA selanjutnya
+        const currentTA = currentEnrolment.masterTahunAkademik.tahunAjaran; // e.g. "2026/2027"
+        const parts = currentTA.split('/');
+        const nextTAStr = `${parseInt(parts[0])+1}/${parseInt(parts[1])+1}`;
+
+        // Cari atau buat TA selanjutnya
+        let nextTA = await prisma.masterTahunAkademik.findFirst({
+            where: { tahunAjaran: nextTAStr, semester: 'Ganjil', sekolahId: currentEnrolment.sekolahId }
+        });
+
+        if (!nextTA) {
+            nextTA = await prisma.masterTahunAkademik.create({
+                data: {
+                    sekolahId: currentEnrolment.sekolahId,
+                    tahunAjaran: nextTAStr,
+                    semester: 'Ganjil',
+                    isActive: false // Default false agar admin mengaktifkannya secara manual jika belum waktunya
+                }
+            });
+        }
+
+        for (const update of updates) {
+            const { siswaId, status } = update;
+            
+            if (status === 'Lulus') {
+                // Lulus: Set isActive false di enrolment saat ini
+                await prisma.enrolmentSiswa.updateMany({
+                    where: { enrolmentKelasId: enrolmentId, siswaId: parseInt(siswaId) },
+                    data: { isActive: false }
+                });
+            } else if (status === 'Cuti/Tidak Naik Kelas') {
+                // Cuti / Tidak Naik Kelas: Siswa tetap berada di kelas yang sama tanpa pindah TA
+                // (Tidak melakukan update apapun sehingga siswa tetap di kelas ini)
+
+            } else if (status === 'Naik Kelas') {
+                let targetNamaKelas = currentEnrolment.masterKelas.namaKelas;
+                
+                // Ganti prefix kelas (X -> XI -> XII)
+                if (targetNamaKelas.startsWith('X ')) {
+                    targetNamaKelas = targetNamaKelas.replace(/^X /, 'XI ');
+                } else if (targetNamaKelas.startsWith('XI ')) {
+                    targetNamaKelas = targetNamaKelas.replace(/^XI /, 'XII ');
+                }
+                
+                // Find or create MasterKelas
+                let nextMasterKelas = await prisma.masterKelas.findFirst({
+                    where: { namaKelas: targetNamaKelas, sekolahId: currentEnrolment.sekolahId }
+                });
+
+                if (!nextMasterKelas) {
+                    nextMasterKelas = await prisma.masterKelas.create({
+                        data: { namaKelas: targetNamaKelas, sekolahId: currentEnrolment.sekolahId }
+                    });
+                }
+                
+                // Find or create EnrolmentKelas
+                let nextEnrolmentKelas = await prisma.enrolmentKelas.findFirst({
+                    where: {
+                        kelasId: nextMasterKelas.id,
+                        angkatanId: currentEnrolment.angkatanId,
+                        tahunAkademikId: nextTA.id,
+                        sekolahId: currentEnrolment.sekolahId
+                    }
+                });
+
+                if (!nextEnrolmentKelas) {
+                    nextEnrolmentKelas = await prisma.enrolmentKelas.create({
+                        data: {
+                            sekolahId: currentEnrolment.sekolahId,
+                            kelasId: nextMasterKelas.id,
+                            angkatanId: currentEnrolment.angkatanId,
+                            tahunAkademikId: nextTA.id,
+                            keterangan: ''
+                        }
+                    });
+                }
+                
+                // Pindahkan siswa ke EnrolmentKelas baru (Update kelasId)
+                await prisma.enrolmentSiswa.updateMany({
+                    where: { enrolmentKelasId: enrolmentId, siswaId: parseInt(siswaId) },
+                    data: { enrolmentKelasId: nextEnrolmentKelas.id }
+                });
+            }
+        }
+        res.status(200).json({ status: 'success' });
+    } catch (error) {
+        console.error("Bulk Status Error:", error);
+        res.status(500).json({ status: 'error', message: 'Gagal memproses status siswa' });
     }
 });
 
