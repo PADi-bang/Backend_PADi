@@ -362,7 +362,14 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
         const ta = await prisma.masterTahunAkademik.findUnique({ where: { id } });
         if(ta) {
             const newIsActive = !ta.isActive;
+            let prevActiveTa = null;
+
             if (newIsActive) {
+                // Cari TA yang sedang aktif sebelum diubah
+                prevActiveTa = await prisma.masterTahunAkademik.findFirst({
+                    where: { sekolahId: ta.sekolahId, isActive: true, id: { not: id } }
+                });
+
                 // Nonaktifkan semua TA lainnya
                 await prisma.masterTahunAkademik.updateMany({
                     where: { sekolahId: ta.sekolahId },
@@ -374,16 +381,153 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
                 data: { isActive: newIsActive }
             });
 
-            // Auto-update TA pada semua kelas di Enrolment
-            if (newIsActive) {
-                await prisma.enrolmentKelas.updateMany({
-                    where: { sekolahId: ta.sekolahId },
-                    data: { tahunAkademikId: id }
+            // Migrasi Enrolment ke TA Baru
+            if (newIsActive && prevActiveTa) {
+                // 1. Dapatkan semua kelas yang punya siswa atau guru aktif HANYA DARI TA SEBELUMNYA (bukan semua histori)
+                const oldEnrolments = await prisma.enrolmentKelas.findMany({
+                    where: { sekolahId: ta.sekolahId, tahunAkademikId: prevActiveTa.id },
+                    include: {
+                        enrolmentSiswa: { where: { isActive: true } },
+                        enrolmentGuru: { where: { isActive: true } },
+                        masterKelas: { include: { tingkat: true } }
+                    }
                 });
+
+                for (const oldClass of oldEnrolments) {
+                    if (oldClass.enrolmentSiswa.length === 0 && oldClass.enrolmentGuru.length === 0) continue;
+
+                    // Jangan membuat sameClassNewTa secara unconditional karena akan menghasilkan kelas zombie (kosong).
+                    // Guru Wali Kelas tidak dimigrasi otomatis karena penugasan biasanya berubah tiap tahun akademik.
+                    // Jika memang ada siswa yang tinggal kelas, kelas untuk mereka akan dibuatkan secara lazy.
+
+                    // Pindahkan Siswa (Create record baru di TA Baru)
+                    for (const es of oldClass.enrolmentSiswa) {
+                        if (es.statusKenaikan === 'Lulus' || es.statusKenaikan === 'Belum Diproses' || !es.statusKenaikan) {
+                            // Lulus: Lulus dan selesai.
+                            // Belum Diproses: Tertinggal di TA lama sampai diproses manual.
+                            continue;
+                        } else if (es.statusKenaikan === 'Tidak Naik / Cuti') {
+                            // Tinggal kelas: Angkatan harus bertambah 1 (bergabung dengan adik kelas)
+                            let targetAngkatanId = oldClass.angkatanId;
+                            const currentAngkatan = await prisma.masterAngkatan.findUnique({ where: { id: oldClass.angkatanId } });
+                            if (currentAngkatan && currentAngkatan.nomorAngkatan) {
+                                const nextAngkatanStr = (parseInt(currentAngkatan.nomorAngkatan) + 1).toString();
+                                let nextAngkatanObj = await prisma.masterAngkatan.findFirst({
+                                    where: { sekolahId: ta.sekolahId, nomorAngkatan: nextAngkatanStr }
+                                });
+                                if (!nextAngkatanObj) {
+                                    nextAngkatanObj = await prisma.masterAngkatan.create({
+                                        data: { sekolahId: ta.sekolahId, nomorAngkatan: nextAngkatanStr, isActive: true }
+                                    });
+                                }
+                                targetAngkatanId = nextAngkatanObj.id;
+                            }
+
+                            // Cari/Buat kelas target (Kelas Sama, Angkatan Baru)
+                            let targetEnrolmentTinggal = await prisma.enrolmentKelas.findFirst({
+                                where: { kelasId: oldClass.kelasId, angkatanId: targetAngkatanId, tahunAkademikId: id }
+                            });
+                            if (!targetEnrolmentTinggal) {
+                                targetEnrolmentTinggal = await prisma.enrolmentKelas.create({
+                                    data: {
+                                        sekolahId: ta.sekolahId,
+                                        kelasId: oldClass.kelasId,
+                                        angkatanId: targetAngkatanId,
+                                        tahunAkademikId: id,
+                                        keterangan: ''
+                                    }
+                                });
+                            }
+
+                            // Create record baru
+                            await prisma.enrolmentSiswa.create({
+                                data: {
+                                    siswaId: es.siswaId,
+                                    enrolmentKelasId: targetEnrolmentTinggal.id,
+                                    statusKenaikan: 'Belum Diproses',
+                                    isActive: true
+                                }
+                            });
+                        } else if (es.statusKenaikan === 'Naik Kelas') {
+                            // Naik kelas: Cari kelas berikutnya
+                            const currentTingkatName = oldClass.masterKelas.tingkat ? oldClass.masterKelas.tingkat.namaTingkat : null;
+                            let nextTingkatName = null;
+                            if (currentTingkatName === 'X') nextTingkatName = 'XI';
+                            else if (currentTingkatName === 'XI') nextTingkatName = 'XII';
+
+                            let nextMasterKelas = null;
+                            if (nextTingkatName) {
+                                const nextTingkat = await prisma.masterTingkat.findFirst({
+                                    where: { namaTingkat: nextTingkatName }
+                                });
+                                if (nextTingkat) {
+                                    nextMasterKelas = await prisma.masterKelas.findFirst({
+                                        where: {
+                                            tingkatId: nextTingkat.id,
+                                            namaKelas: oldClass.masterKelas.namaKelas,
+                                            sekolahId: ta.sekolahId
+                                        }
+                                    });
+                                }
+                            }
+
+                            if (nextMasterKelas) {
+                                let targetEnrolment = await prisma.enrolmentKelas.findFirst({
+                                    where: { kelasId: nextMasterKelas.id, angkatanId: oldClass.angkatanId, tahunAkademikId: id }
+                                });
+                                if (!targetEnrolment) {
+                                    targetEnrolment = await prisma.enrolmentKelas.create({
+                                        data: {
+                                            sekolahId: ta.sekolahId,
+                                            kelasId: nextMasterKelas.id,
+                                            angkatanId: oldClass.angkatanId,
+                                            tahunAkademikId: id,
+                                            keterangan: ''
+                                        }
+                                    });
+                                }
+                                await prisma.enrolmentSiswa.create({
+                                    data: {
+                                        siswaId: es.siswaId,
+                                        enrolmentKelasId: targetEnrolment.id,
+                                        statusKenaikan: 'Belum Diproses',
+                                        isActive: true
+                                    }
+                                });
+                            } else {
+                                // Jika kelas target tidak ada (misal dari kelas XII), letakkan di kelas yang sama di TA baru (angkatan sama)
+                                let fallbackEnrolment = await prisma.enrolmentKelas.findFirst({
+                                    where: { kelasId: oldClass.kelasId, angkatanId: oldClass.angkatanId, tahunAkademikId: id }
+                                });
+                                if (!fallbackEnrolment) {
+                                    fallbackEnrolment = await prisma.enrolmentKelas.create({
+                                        data: {
+                                            sekolahId: ta.sekolahId,
+                                            kelasId: oldClass.kelasId,
+                                            angkatanId: oldClass.angkatanId,
+                                            tahunAkademikId: id,
+                                            keterangan: ''
+                                        }
+                                    });
+                                }
+
+                                await prisma.enrolmentSiswa.create({
+                                    data: {
+                                        siswaId: es.siswaId,
+                                        enrolmentKelasId: fallbackEnrolment.id,
+                                        statusKenaikan: 'Belum Diproses',
+                                        isActive: true
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
             }
         }
         res.status(200).json({ status: 'success' });
     } catch (error) {
+        console.error("Gagal toggle TA:", error);
         res.status(500).json({ status: 'error', message: 'Gagal mengaktifkan tahun akademik' });
     }
 });

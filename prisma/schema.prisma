@@ -211,6 +211,7 @@ model EnrolmentSiswa {
   siswaId          Int            @map("id_siswa")
   enrolmentKelasId Int            @map("id_enrolment_kelas")
   isActive         Boolean        @map("is_active")
+  statusKenaikan   String?        @default("Belum Diproses") @map("status_kenaikan")
   siswa            Siswa          @relation(fields: [siswaId], references: [id])
   enrolmentKelas   EnrolmentKelas @relation(fields: [enrolmentKelasId], references: [id])
 
