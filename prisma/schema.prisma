@@ -142,11 +142,21 @@ model Sekolah {
   @@map("sekolah")
 }
 
+model MasterTingkat {
+  id          Int           @id @default(autoincrement()) @map("id_tingkat")
+  namaTingkat String        @map("nama_tingkat")
+  kelas       MasterKelas[]
+
+  @@map("master_tingkat")
+}
+
 model MasterKelas {
   id             Int              @id @default(autoincrement()) @map("id_kelas")
   sekolahId      Int              @map("id_sekolah")
+  tingkatId      Int?             @map("id_tingkat")
   namaKelas      String           @map("nama_kelas")
   sekolah        Sekolah          @relation(fields: [sekolahId], references: [id])
+  tingkat        MasterTingkat?   @relation(fields: [tingkatId], references: [id])
   enrolmentKelas EnrolmentKelas[]
   jadwalAbsensi  JadwalAbsensi[]
 

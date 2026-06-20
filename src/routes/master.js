@@ -5,31 +5,37 @@ const prisma = new PrismaClient();
 
 // Fungsi helper untuk mendapatkan semester aktif saat ini
 async function getSemesterAktif() {
-    const bulanSekarang = new Date().getMonth() + 1; // 1-12
+    const now = new Date();
+    const currentYear = now.getFullYear();
     
-    let mulaiGanjil = 7; let selesaiGanjil = 12;
-    let mulaiGenap = 1; let selesaiGenap = 6;
+    // Default dates: Ganjil starts July 15, Genap starts January 10
+    let tglGanjil = "07-15";
+    let tglGenap = "01-10";
     
     try {
         const config = await prisma.pengaturan.findMany();
         config.forEach(c => {
-            if(c.kunci === 'bulan_mulai_ganjil') mulaiGanjil = parseInt(c.nilai);
-            if(c.kunci === 'bulan_selesai_ganjil') selesaiGanjil = parseInt(c.nilai);
-            if(c.kunci === 'bulan_mulai_genap') mulaiGenap = parseInt(c.nilai);
-            if(c.kunci === 'bulan_selesai_genap') selesaiGenap = parseInt(c.nilai);
+            if(c.kunci === 'tanggal_mulai_ganjil') tglGanjil = c.nilai;
+            if(c.kunci === 'tanggal_mulai_genap') tglGenap = c.nilai;
         });
     } catch(e) {}
-    
-    // Logika ganjil
-    let isGanjil = false;
-    if (mulaiGanjil <= selesaiGanjil) {
-        if (bulanSekarang >= mulaiGanjil && bulanSekarang <= selesaiGanjil) isGanjil = true;
-    } else {
-        if (bulanSekarang >= mulaiGanjil || bulanSekarang <= selesaiGanjil) isGanjil = true;
-    }
 
-    if (isGanjil) return 'Ganjil';
-    return 'Genap';
+    const [bulanGanjil, hariGanjil] = tglGanjil.split('-').map(Number);
+    const [bulanGenap, hariGenap] = tglGenap.split('-').map(Number);
+
+    const dateGanjil = new Date(currentYear, bulanGanjil - 1, hariGanjil);
+    const dateGenap = new Date(currentYear, bulanGenap - 1, hariGenap);
+
+    // Determine which date comes first in the calendar year
+    if (dateGanjil < dateGenap) {
+        // e.g., Ganjil starts Jan 15, Genap starts Jul 15
+        if (now >= dateGanjil && now < dateGenap) return 'Ganjil';
+        return 'Genap';
+    } else {
+        // e.g., Ganjil starts Jul 15, Genap starts Jan 10 (Indonesian standard)
+        if (now >= dateGenap && now < dateGanjil) return 'Genap';
+        return 'Ganjil';
+    }
 }
 
 // ==========================================
@@ -45,16 +51,24 @@ router.get('/pengaturan', async (req, res) => {
 });
 
 router.post('/pengaturan', async (req, res) => {
-    const { ganjil, ganjilSelesai, genap, genapSelesai } = req.body;
+    const { tanggalGanjil, bulanGanjil, tanggalGenap, bulanGenap } = req.body;
     try {
+        const formatTgl = (b, t) => `${String(b).padStart(2, '0')}-${String(t).padStart(2, '0')}`;
+        
+        const ganjilFormatted = formatTgl(bulanGanjil, tanggalGanjil);
+        const genapFormatted = formatTgl(bulanGenap, tanggalGenap);
+        
+        if (ganjilFormatted === genapFormatted) {
+            return res.status(400).json({ status: 'error', message: 'Tanggal_tidak_boleh_sama' });
+        }
+
         const settings = [
-            { kunci: 'bulan_mulai_ganjil', nilai: ganjil.toString() },
-            { kunci: 'bulan_selesai_ganjil', nilai: ganjilSelesai.toString() },
-            { kunci: 'bulan_mulai_genap', nilai: genap.toString() },
-            { kunci: 'bulan_selesai_genap', nilai: genapSelesai.toString() }
+            { kunci: 'tanggal_mulai_ganjil', nilai: ganjilFormatted },
+            { kunci: 'tanggal_mulai_genap', nilai: genapFormatted }
         ];
+
         for (const s of settings) {
-            if (s.nilai) {
+            if (s.nilai && !s.nilai.includes('undefined')) {
                 await prisma.pengaturan.upsert({
                     where: { kunci: s.kunci },
                     update: { nilai: s.nilai },
@@ -81,10 +95,18 @@ router.post('/pengaturan', async (req, res) => {
 // ==========================================
 router.get('/kelas', async (req, res) => {
     try {
-        const kelas = await prisma.masterKelas.findMany({
-            include: { sekolah: true },
-            orderBy: { namaKelas: 'asc' }
+        const kelasRaw = await prisma.masterKelas.findMany({
+            include: { sekolah: true, tingkat: true },
+            orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });
+        
+        // Map data to include combined namaKelas so frontend remains compatible
+        const kelas = kelasRaw.map(k => ({
+            ...k,
+            namaKelasSuffix: k.namaKelas,
+            namaKelas: k.tingkat ? `${k.tingkat.namaTingkat} ${k.namaKelas}` : k.namaKelas
+        }));
+
         res.status(200).json({ status: 'success', data: kelas });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Gagal mengambil data master kelas' });
@@ -92,42 +114,54 @@ router.get('/kelas', async (req, res) => {
 });
 
 router.post('/kelas', async (req, res) => {
-    const { prefix, namaKelasAkhiran, sekolahId } = req.body;
+    const { namaKelasAkhiran, sekolahId } = req.body;
     try {
-        const namaKelas = `${prefix} ${namaKelasAkhiran}`.trim();
+        const suffix = namaKelasAkhiran.trim().toUpperCase();
+        
+        // Fetch all Tingkats (X, XI, XII)
+        const tingkats = await prisma.masterTingkat.findMany({ orderBy: { id: 'asc' } });
+        if (tingkats.length === 0) {
+             return res.status(400).json({ status: 'error', message: 'Master Tingkat kosong' });
+        }
+
         // Cek duplikasi
         const existing = await prisma.masterKelas.findFirst({
-            where: { namaKelas: { equals: namaKelas, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
+            where: { namaKelas: { equals: suffix, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
         });
         if (existing) {
             return res.status(400).json({ status: 'error', message: 'Nama kelas sudah ada' });
         }
 
-        const newKelas = await prisma.masterKelas.create({
-            data: { 
-                namaKelas, 
-                sekolahId: parseInt(sekolahId) || 1 
-            }
-        });
-
-        // Auto-enrolment jika prefix kelas (Tingkat) sudah diatur
-        const existingEnrolmentInSamePrefix = await prisma.enrolmentKelas.findFirst({
-            where: { masterKelas: { namaKelas: { startsWith: prefix + ' ' } } }
-        });
-
-        if (existingEnrolmentInSamePrefix) {
-            await prisma.enrolmentKelas.create({
-                data: {
-                    sekolahId: parseInt(sekolahId) || 1,
-                    kelasId: newKelas.id,
-                    angkatanId: existingEnrolmentInSamePrefix.angkatanId,
-                    tahunAkademikId: existingEnrolmentInSamePrefix.tahunAkademikId,
-                    keterangan: ''
+        const createdClasses = [];
+        for (const t of tingkats) {
+            const newKelas = await prisma.masterKelas.create({
+                data: { 
+                    namaKelas: suffix, 
+                    tingkatId: t.id,
+                    sekolahId: parseInt(sekolahId) || 1 
                 }
             });
+            createdClasses.push(newKelas);
+
+            // Auto-enrolment jika tingkat sudah diatur
+            const existingEnrolmentInSameTingkat = await prisma.enrolmentKelas.findFirst({
+                where: { masterKelas: { tingkatId: t.id } }
+            });
+
+            if (existingEnrolmentInSameTingkat) {
+                await prisma.enrolmentKelas.create({
+                    data: {
+                        sekolahId: parseInt(sekolahId) || 1,
+                        kelasId: newKelas.id,
+                        angkatanId: existingEnrolmentInSameTingkat.angkatanId,
+                        tahunAkademikId: existingEnrolmentInSameTingkat.tahunAkademikId,
+                        keterangan: ''
+                    }
+                });
+            }
         }
 
-        res.status(201).json({ status: 'success', data: newKelas });
+        res.status(201).json({ status: 'success', data: createdClasses });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Gagal menambah master kelas' });
     }
@@ -136,10 +170,53 @@ router.post('/kelas', async (req, res) => {
 router.delete('/kelas/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
+        // Find enrolments related to this class to cascade delete
+        const enrolments = await prisma.enrolmentKelas.findMany({ where: { kelasId: id } });
+        for (const e of enrolments) {
+            await prisma.enrolmentSiswa.deleteMany({ where: { enrolmentKelasId: e.id } });
+            await prisma.enrolmentGuru.deleteMany({ where: { enrolmentKelasId: e.id } });
+        }
+        await prisma.enrolmentKelas.deleteMany({ where: { kelasId: id } });
+
+        // Prisma handles implicit many-to-many (jadwalAbsensi) automatically
         await prisma.masterKelas.delete({ where: { id } });
         res.status(200).json({ status: 'success' });
     } catch (error) {
+        console.error("Gagal hapus kelas:", error);
         res.status(500).json({ status: 'error', message: 'Gagal menghapus master kelas' });
+    }
+});
+
+router.delete('/kelas/group/:suffix', async (req, res) => {
+    const suffix = req.params.suffix;
+    try {
+        // Find all classes matching the suffix
+        const classes = await prisma.masterKelas.findMany({
+            where: { namaKelas: { equals: suffix, mode: 'insensitive' } }
+        });
+
+        if (classes.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'Kelas tidak ditemukan' });
+        }
+
+        // Extract class IDs
+        const classIds = classes.map(c => c.id);
+
+        // Find enrolments related to these classes to cascade delete
+        const enrolments = await prisma.enrolmentKelas.findMany({ where: { kelasId: { in: classIds } } });
+        for (const e of enrolments) {
+            await prisma.enrolmentSiswa.deleteMany({ where: { enrolmentKelasId: e.id } });
+            await prisma.enrolmentGuru.deleteMany({ where: { enrolmentKelasId: e.id } });
+        }
+        await prisma.enrolmentKelas.deleteMany({ where: { kelasId: { in: classIds } } });
+
+        // Prisma handles implicit many-to-many (jadwalAbsensi) automatically
+        await prisma.masterKelas.deleteMany({ where: { id: { in: classIds } } });
+        
+        res.status(200).json({ status: 'success' });
+    } catch (error) {
+        console.error("Gagal hapus group kelas:", error);
+        res.status(500).json({ status: 'error', message: 'Gagal menghapus group master kelas' });
     }
 });
 
@@ -211,9 +288,18 @@ router.put('/angkatan/:id/toggle-active', async (req, res) => {
 router.delete('/angkatan/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
+        // Find enrolments related to this angkatan to cascade delete
+        const enrolments = await prisma.enrolmentKelas.findMany({ where: { angkatanId: id } });
+        for (const e of enrolments) {
+            await prisma.enrolmentSiswa.deleteMany({ where: { enrolmentKelasId: e.id } });
+            await prisma.enrolmentGuru.deleteMany({ where: { enrolmentKelasId: e.id } });
+        }
+        await prisma.enrolmentKelas.deleteMany({ where: { angkatanId: id } });
+
         await prisma.masterAngkatan.delete({ where: { id } });
         res.status(200).json({ status: 'success' });
     } catch (error) {
+        console.error("Gagal hapus angkatan:", error);
         res.status(500).json({ status: 'error', message: 'Gagal menghapus master angkatan' });
     }
 });
@@ -305,9 +391,18 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
 router.delete('/tahun-akademik/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
+        // Find enrolments related to this TA to cascade delete
+        const enrolments = await prisma.enrolmentKelas.findMany({ where: { tahunAkademikId: id } });
+        for (const e of enrolments) {
+            await prisma.enrolmentSiswa.deleteMany({ where: { enrolmentKelasId: e.id } });
+            await prisma.enrolmentGuru.deleteMany({ where: { enrolmentKelasId: e.id } });
+        }
+        await prisma.enrolmentKelas.deleteMany({ where: { tahunAkademikId: id } });
+
         await prisma.masterTahunAkademik.delete({ where: { id } });
         res.status(200).json({ status: 'success' });
     } catch (error) {
+        console.error("Gagal hapus TA:", error);
         res.status(500).json({ status: 'error', message: 'Gagal menghapus master tahun akademik' });
     }
 });
