@@ -6,19 +6,37 @@ const prisma = new PrismaClient();
 // Ambil semua jadwal beserta kelas yang ter-assign
 router.get('/', async (req, res) => {
     try {
-        const jadwalList = await prisma.jadwalAbsensi.findMany({
+        const jadwalListRaw = await prisma.jadwalAbsensi.findMany({
             include: {
-                kelas: true // Ambil relasi kelas
+                kelas: { include: { tingkat: true } } // Ambil relasi kelas & tingkat
             }
         });
 
         // Ambil semua kelas untuk panel 'Kelas Yang Belum Terjadwal'
-        // Kita bisa ambil semua kelas, nanti difilter di frontend mana yang belum punya jadwal
-        const kelasList = await prisma.masterKelas.findMany({
+        const kelasListRaw = await prisma.masterKelas.findMany({
             include: {
-                jadwalAbsensi: true
-            }
+                jadwalAbsensi: true,
+                tingkat: true
+            },
+            orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });
+
+        // Map namaKelas agar gabung dengan namaTingkat
+        const mapKelas = (k) => {
+            if (!k) return k;
+            return {
+                ...k,
+                namaKelasSuffix: k.namaKelas,
+                namaKelas: k.tingkat ? `${k.tingkat.namaTingkat} ${k.namaKelas}` : k.namaKelas
+            };
+        };
+
+        const jadwalList = jadwalListRaw.map(j => ({
+            ...j,
+            kelas: j.kelas.map(mapKelas)
+        }));
+
+        const kelasList = kelasListRaw.map(mapKelas);
 
         res.json({
             status: 'success',
