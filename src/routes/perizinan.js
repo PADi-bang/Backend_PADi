@@ -21,7 +21,11 @@ const storage = multer.diskStorage({
         cb(null, Date.now() + path.extname(file.originalname));
     }
 });
-const upload = multer({ storage: storage });
+const upload = multer({ 
+    storage: storage,
+    // [REKOMENDASI] Batasi ukuran file maksimal 2MB untuk mencegah unggahan file besar
+    limits: { fileSize: 2 * 1024 * 1024 } 
+});
 
 // ==========================================
 // 1. SISWA MENGIRIM IZIN BARU (Upload File)
