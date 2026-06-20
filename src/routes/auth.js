@@ -4,6 +4,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const prisma = require('../db');
 const bcrypt = require('bcryptjs');
+const verifyToken = require('../middleware/auth');
 
 // POST /api/auth/register
 // Sesuai dengan skema baru di database.md
@@ -148,7 +149,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role.namaRole },
       process.env.JWT_SECRET, // Pastikan ada JWT_SECRET di file .env Anda!
-      { expiresIn: '8h' }
+      { expiresIn: '30d' }
     );
 
     // 6. Kembalikan respons yang sudah diperkaya dengan data geofence
@@ -165,7 +166,7 @@ router.post('/login', async (req, res) => {
 });
 // GET /api/auth/users
 // Mengambil semua data pengguna beserta rolenya (Cocok untuk halaman Daftar Siswa/Guru)
-router.get('/users', async (req, res) => {
+router.get('/users', verifyToken, async (req, res) => {
   try {
     // Gunakan findMany() untuk mengambil BANYAK data (bukan cuma satu)
     const allUsers = await prisma.user.findMany({
