@@ -406,7 +406,19 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
                             // Lulus: Lulus dan selesai.
                             // Belum Diproses: Tertinggal di TA lama sampai diproses manual.
                             continue;
-                        } else if (es.statusKenaikan === 'Tidak Naik / Cuti') {
+                        }
+
+                        // Cek apakah siswa ini sudah termigrasi/ada di TA yang baru
+                        // (Mencegah duplikasi jika Admin bolak-balik mengaktifkan TA)
+                        const existingInNewTa = await prisma.enrolmentSiswa.findFirst({
+                            where: {
+                                siswaId: es.siswaId,
+                                enrolmentKelas: { tahunAkademikId: id }
+                            }
+                        });
+                        if (existingInNewTa) continue;
+
+                        if (es.statusKenaikan === 'Tidak Naik / Cuti') {
                             // Tinggal kelas: Angkatan harus bertambah 1 (bergabung dengan adik kelas)
                             let targetAngkatanId = oldClass.angkatanId;
                             const currentAngkatan = await prisma.masterAngkatan.findUnique({ where: { id: oldClass.angkatanId } });
