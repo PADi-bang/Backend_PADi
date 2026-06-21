@@ -142,11 +142,21 @@ model Sekolah {
   @@map("sekolah")
 }
 
+model MasterTingkat {
+  id          Int           @id @default(autoincrement()) @map("id_tingkat")
+  namaTingkat String        @map("nama_tingkat")
+  kelas       MasterKelas[]
+
+  @@map("master_tingkat")
+}
+
 model MasterKelas {
   id             Int              @id @default(autoincrement()) @map("id_kelas")
   sekolahId      Int              @map("id_sekolah")
+  tingkatId      Int?             @map("id_tingkat")
   namaKelas      String           @map("nama_kelas")
   sekolah        Sekolah          @relation(fields: [sekolahId], references: [id])
+  tingkat        MasterTingkat?   @relation(fields: [tingkatId], references: [id])
   enrolmentKelas EnrolmentKelas[]
   jadwalAbsensi  JadwalAbsensi[]
 
@@ -201,6 +211,7 @@ model EnrolmentSiswa {
   siswaId          Int            @map("id_siswa")
   enrolmentKelasId Int            @map("id_enrolment_kelas")
   isActive         Boolean        @map("is_active")
+  statusKenaikan   String?        @default("Belum Diproses") @map("status_kenaikan")
   siswa            Siswa          @relation(fields: [siswaId], references: [id])
   enrolmentKelas   EnrolmentKelas @relation(fields: [enrolmentKelasId], references: [id])
 
@@ -226,11 +237,12 @@ model JadwalAbsensi {
   sekolahId      Int       @map("id_sekolah")
   namaJadwal     String    @map("nama_jadwal")
   hari           String
-  tanggal        DateTime? @db.Date
+  tanggal        DateTime[] @db.Date
   jamMasukStart  DateTime  @map("jam_masuk_start") @db.Time
   jamMasukFinish DateTime  @map("jam_masuk_finish") @db.Time
   jamPulang      DateTime  @map("jam_pulang") @db.Time
   isLibur        Boolean   @map("is_libur")
+  isActive       Boolean   @default(false) @map("is_active")
   sekolah        Sekolah   @relation(fields: [sekolahId], references: [id])
   absensi        Absensi[]
   kelas          MasterKelas[]

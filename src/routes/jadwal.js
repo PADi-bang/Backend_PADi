@@ -6,19 +6,40 @@ const prisma = new PrismaClient();
 // Ambil semua jadwal beserta kelas yang ter-assign
 router.get('/', async (req, res) => {
     try {
-        const jadwalList = await prisma.jadwalAbsensi.findMany({
+        const jadwalListRaw = await prisma.jadwalAbsensi.findMany({
             include: {
-                kelas: true // Ambil relasi kelas
+                kelas: { include: { tingkat: true } } // Ambil relasi kelas & tingkat
+            },
+            orderBy: {
+                namaJadwal: 'asc'
             }
         });
 
         // Ambil semua kelas untuk panel 'Kelas Yang Belum Terjadwal'
-        // Kita bisa ambil semua kelas, nanti difilter di frontend mana yang belum punya jadwal
-        const kelasList = await prisma.masterKelas.findMany({
+        const kelasListRaw = await prisma.masterKelas.findMany({
             include: {
-                jadwalAbsensi: true
-            }
+                jadwalAbsensi: true,
+                tingkat: true
+            },
+            orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });
+
+        // Map namaKelas agar gabung dengan namaTingkat
+        const mapKelas = (k) => {
+            if (!k) return k;
+            return {
+                ...k,
+                namaKelasSuffix: k.namaKelas,
+                namaKelas: k.tingkat ? `${k.tingkat.namaTingkat} ${k.namaKelas}` : k.namaKelas
+            };
+        };
+
+        const jadwalList = jadwalListRaw.map(j => ({
+            ...j,
+            kelas: j.kelas.map(mapKelas)
+        }));
+
+        const kelasList = kelasListRaw.map(mapKelas);
 
         res.json({
             status: 'success',
@@ -36,7 +57,7 @@ router.get('/', async (req, res) => {
 // Buat jadwal baru
 router.post('/', async (req, res) => {
     try {
-        const { namaJadwal, hari, tanggal, jamMasukStart, jamMasukFinish, jamPulang } = req.body;
+        const { namaJadwal, tipeJadwal, tanggal, jamMasukStart, jamMasukFinish, jamPulang } = req.body;
 
         // Validasi dan konversi waktu
         const parseTime = (timeStr) => {
@@ -47,12 +68,20 @@ router.post('/', async (req, res) => {
             return date;
         };
 
+        const currentHari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
+
+        let processedTanggal = [];
+        if (tipeJadwal === 'Khusus' && tanggal) {
+            const dates = Array.isArray(tanggal) ? tanggal : tanggal.split(',');
+            processedTanggal = dates.map(d => new Date(d.trim()));
+        }
+
         const newJadwal = await prisma.jadwalAbsensi.create({
             data: {
                 sekolahId: 1, // Default sementara
                 namaJadwal,
-                hari: hari || 'Senin-Jumat',
-                tanggal: tanggal ? new Date(tanggal) : null,
+                hari: currentHari,
+                tanggal: processedTanggal,
                 jamMasukStart: parseTime(jamMasukStart),
                 jamMasukFinish: parseTime(jamMasukFinish),
                 jamPulang: parseTime(jamPulang),
@@ -74,14 +103,12 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { namaJadwal, hari, tanggal, jamMasukStart, jamMasukFinish, jamPulang } = req.body;
+        const { namaJadwal, tipeJadwal, tanggal, jamMasukStart, jamMasukFinish, jamPulang } = req.body;
 
         const parseTime = (timeStr) => {
             if (!timeStr) return null;
-            // Jika format ISO, ambil jam dan menitnya
             if (timeStr.includes('T')) {
-                const d = new Date(timeStr);
-                return d; // Atau parsing ulang
+                return new Date(timeStr);
             }
             const date = new Date();
             const [hours, minutes] = timeStr.split(':');
@@ -89,10 +116,15 @@ router.put('/:id', async (req, res) => {
             return date;
         };
 
+        let processedTanggal = [];
+        if (tipeJadwal === 'Khusus' && tanggal) {
+            const dates = Array.isArray(tanggal) ? tanggal : tanggal.split(',');
+            processedTanggal = dates.map(d => new Date(d.trim()));
+        }
+
         const updateData = {
             namaJadwal,
-            hari: hari || 'Senin-Jumat',
-            tanggal: tanggal ? new Date(tanggal) : null,
+            tanggal: processedTanggal,
         };
         
         if (jamMasukStart) updateData.jamMasukStart = parseTime(jamMasukStart);
@@ -118,6 +150,11 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
+
+        // Hapus data absensi terkait terlebih dahulu untuk menghindari error foreign key constraint
+        await prisma.absensi.deleteMany({
+            where: { jadwalId: parseInt(id) }
+        });
 
         await prisma.jadwalAbsensi.delete({
             where: { id: parseInt(id) }
@@ -206,6 +243,52 @@ router.put('/:id/toggle', async (req, res) => {
         });
     } catch (error) {
         console.error("Error PUT /jadwal/toggle:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Aktifkan jadwal
+router.put('/:id/activate', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Pertama, nonaktifkan semua jadwal
+        await prisma.jadwalAbsensi.updateMany({
+            data: { isActive: false }
+        });
+
+        // Kemudian aktifkan jadwal yang dipilih
+        const updatedJadwal = await prisma.jadwalAbsensi.update({
+            where: { id: parseInt(id) },
+            data: { isActive: true }
+        });
+
+        res.json({
+            status: 'success',
+            data: updatedJadwal
+        });
+    } catch (error) {
+        console.error("Error PUT /jadwal/activate:", error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Nonaktifkan jadwal
+router.put('/:id/deactivate', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const updatedJadwal = await prisma.jadwalAbsensi.update({
+            where: { id: parseInt(id) },
+            data: { isActive: false }
+        });
+
+        res.json({
+            status: 'success',
+            data: updatedJadwal
+        });
+    } catch (error) {
+        console.error("Error PUT /jadwal/deactivate:", error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });

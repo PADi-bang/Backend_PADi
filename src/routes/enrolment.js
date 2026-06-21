@@ -16,31 +16,66 @@ const upload = multer({ dest: os.tmpdir() });
 // 1. Dapatkan daftar Master Kelas dan Enrolment-nya
 router.get('/', async (req, res) => {
     try {
+        const taId = req.query.taId ? parseInt(req.query.taId) : null;
+        let activeTa = null;
+
+        if (taId) {
+            activeTa = await prisma.masterTahunAkademik.findUnique({ where: { id: taId } });
+        }
+        if (!activeTa) {
+            activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
+        }
+
         const masterKelasList = await prisma.masterKelas.findMany({
-            orderBy: { namaKelas: 'asc' }
+            include: { tingkat: true },
+            orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });
         
         const enrolments = await prisma.enrolmentKelas.findMany({
+            where: {
+                sekolahId: 1,
+                tahunAkademikId: activeTa ? activeTa.id : undefined
+            },
             include: {
-                masterKelas: true,
+                masterKelas: { include: { tingkat: true } },
                 masterAngkatan: true,
                 masterTahunAkademik: true,
                 enrolmentGuru: {
+                    where: { isActive: true },
                     include: { guru: true }
                 },
                 _count: {
-                    select: { enrolmentSiswa: true, enrolmentGuru: true }
+                    select: { 
+                        enrolmentSiswa: { where: { isActive: true } }, 
+                        enrolmentGuru: { where: { isActive: true } } 
+                    }
                 }
             }
         });
 
         // Map enrolments ke masterKelas
-        const data = masterKelasList.map(mk => {
-            const enrolment = enrolments.find(e => e.kelasId === mk.id);
-            return {
-                masterKelas: mk,
-                enrolment: enrolment || null
+        const data = masterKelasList.flatMap(mk => {
+            const mappedMk = {
+                ...mk,
+                namaKelasSuffix: mk.namaKelas,
+                namaKelas: mk.tingkat ? `${mk.tingkat.namaTingkat} ${mk.namaKelas}` : mk.namaKelas
             };
+            const classEnrolments = enrolments.filter(e => e.kelasId === mk.id);
+            
+            if (classEnrolments.length > 0) {
+                return classEnrolments.map(enrolment => {
+                    enrolment.masterKelas = mappedMk;
+                    return {
+                        masterKelas: mappedMk,
+                        enrolment: enrolment
+                    };
+                });
+            } else {
+                return [{
+                    masterKelas: mappedMk,
+                    enrolment: null
+                }];
+            }
         });
 
         res.status(200).json({ status: 'success', data });
@@ -52,11 +87,16 @@ router.get('/', async (req, res) => {
 // 2. Dapatkan data master untuk form "Tambah Kelas"
 router.get('/master-data', async (req, res) => {
     try {
-        const [kelas, angkatan, ta] = await Promise.all([
-            prisma.masterKelas.findMany({ orderBy: { namaKelas: 'asc' } }),
+        const [kelasRaw, angkatan, ta] = await Promise.all([
+            prisma.masterKelas.findMany({ include: { tingkat: true }, orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }] }),
             prisma.masterAngkatan.findMany({ orderBy: { nomorAngkatan: 'asc' } }),
             prisma.masterTahunAkademik.findMany({ orderBy: { tahunAjaran: 'asc' } })
         ]);
+        const kelas = kelasRaw.map(k => ({
+            ...k,
+            namaKelasSuffix: k.namaKelas,
+            namaKelas: k.tingkat ? `${k.tingkat.namaTingkat} ${k.namaKelas}` : k.namaKelas
+        }));
         res.status(200).json({ status: 'success', data: { kelas, angkatan, ta } });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Gagal mengambil master data' });
@@ -84,11 +124,11 @@ router.post('/edit-tingkat', async (req, res) => {
         // Cek validasi tingkat (prefix)
         const usedInOther = await prisma.enrolmentKelas.findMany({
             where: { angkatanId: parseInt(angkatanId), tahunAkademikId: tahunAkademikId },
-            include: { masterKelas: true }
+            include: { masterKelas: { include: { tingkat: true } } }
         });
 
         for (const enr of usedInOther) {
-            const prefixOther = enr.masterKelas.namaKelas.split(' ')[0].toUpperCase();
+            const prefixOther = enr.masterKelas.tingkat ? enr.masterKelas.tingkat.namaTingkat : enr.masterKelas.namaKelas.split(' ')[0].toUpperCase();
             if (prefixOther !== prefix.toUpperCase()) {
                 return res.status(400).json({ 
                     status: 'error', 
@@ -97,8 +137,11 @@ router.post('/edit-tingkat', async (req, res) => {
             }
         }
 
+        const tingkat = await prisma.masterTingkat.findFirst({ where: { namaTingkat: prefix } });
+        if (!tingkat) return res.status(400).json({ status: 'error', message: 'Tingkat tidak valid' });
+
         const masterKelasList = await prisma.masterKelas.findMany({
-            where: { namaKelas: { startsWith: prefix + ' ' } }
+            where: { tingkatId: tingkat.id }
         });
 
         for (const mk of masterKelasList) {
@@ -130,8 +173,11 @@ router.post('/edit-tingkat', async (req, res) => {
 router.post('/reset-tingkat', async (req, res) => {
     const { prefix } = req.body;
     try {
+        const tingkat = await prisma.masterTingkat.findFirst({ where: { namaTingkat: prefix } });
+        if (!tingkat) return res.status(400).json({ status: 'error', message: 'Tingkat tidak valid' });
+
         const enrolments = await prisma.enrolmentKelas.findMany({
-            where: { masterKelas: { namaKelas: { startsWith: prefix + ' ' } } }
+            where: { masterKelas: { tingkatId: tingkat.id } }
         });
         
         for (const enrolment of enrolments) {
@@ -145,52 +191,10 @@ router.post('/reset-tingkat', async (req, res) => {
     }
 });
 
-// 5. Edit Keterangan Kelas
-router.post('/edit-keterangan/:kelasId', async (req, res) => {
-    const kelasId = parseInt(req.params.kelasId);
-    const { keterangan } = req.body;
-    try {
-        const existingEnrolment = await prisma.enrolmentKelas.findFirst({ where: { kelasId } });
-        if (!existingEnrolment) {
-            return res.status(400).json({ 
-                status: 'error', 
-                message: 'Tidak dapat mengisi keterangan karena tingkat kelas belum diatur (Angkatan dan Tahun Akademik kosong).' 
-            });
-        }
-
-        await prisma.enrolmentKelas.update({
-            where: { id: existingEnrolment.id },
-            data: { keterangan }
-        });
-        
-        res.status(200).json({ status: 'success' });
-    } catch (error) {
-        res.status(500).json({ status: 'error', message: 'Gagal mengubah keterangan kelas' });
-    }
-});
 
 // ==========================================
 // DETAIL ENROLMENT KELAS (SISWA & GURU)
 // ==========================================
-
-// GET Template Excel Siswa
-router.get('/template-excel', (req, res) => {
-    try {
-        const workbook = xlsx.utils.book_new();
-        const worksheet = xlsx.utils.json_to_sheet([
-            { 'NIS': '123456', 'NAMA LENGKAP': 'Budi Santoso' },
-            { 'NIS': '654321', 'NAMA LENGKAP': 'Siti Aminah' }
-        ]);
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'Siswa');
-        const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-        
-        res.setHeader('Content-Disposition', 'attachment; filename="Template_Upload_Siswa.xlsx"');
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.send(buffer);
-    } catch (error) {
-        res.status(500).json({ status: 'error', message: 'Gagal membuat template excel' });
-    }
-});
 
 // 5. Detail Enrolment Kelas (Daftar Siswa & Guru di dalamnya)
 router.get('/:id/detail', async (req, res) => {
@@ -199,19 +203,26 @@ router.get('/:id/detail', async (req, res) => {
         const enrolment = await prisma.enrolmentKelas.findUnique({
             where: { id },
             include: {
-                masterKelas: true,
+                masterKelas: { include: { tingkat: true } },
                 masterAngkatan: true,
                 masterTahunAkademik: true,
                 enrolmentSiswa: {
+                    where: { isActive: true },
                     include: { siswa: true }
                 },
                 enrolmentGuru: {
+                    where: { isActive: true },
                     include: { guru: true }
                 }
             }
         });
 
         if (!enrolment) return res.status(404).json({ status: 'error', message: 'Kelas tidak ditemukan' });
+
+        if (enrolment.masterKelas) {
+            enrolment.masterKelas.namaKelasSuffix = enrolment.masterKelas.namaKelas;
+            enrolment.masterKelas.namaKelas = enrolment.masterKelas.tingkat ? `${enrolment.masterKelas.tingkat.namaTingkat} ${enrolment.masterKelas.namaKelas}` : enrolment.masterKelas.namaKelas;
+        }
 
         // Ambil semua siswa & guru yang ada di database untuk opsi dropdown "Tambah"
         const [allSiswa, allGuru] = await Promise.all([
@@ -255,79 +266,157 @@ router.post('/:id/siswa', async (req, res) => {
     }
 });
 
-// Upload Excel Siswa
-router.post('/:id/siswa/upload', upload.single('fileExcel'), async (req, res) => {
-    const enrolmentKelasId = parseInt(req.params.id);
-    if (!req.file) {
-        return res.status(400).json({ status: 'error', message: 'File tidak ditemukan' });
-    }
 
+// Proses Kenaikan Kelas (Bulk Action)
+router.post('/:id/proses-kenaikan', async (req, res) => {
+    const currentEnrolmentKelasId = parseInt(req.params.id);
+    
     try {
-        const workbook = xlsx.readFile(req.file.path);
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(sheet);
-        
-        for (const row of data) {
-            // Coba ambil NIS dan NAMA dari beberapa kemungkinan key header
-            let nis = row['NIS'] || row['nis'] || row['Nis'];
-            let nama = row['NAMA LENGKAP'] || row['Nama Lengkap'] || row['nama'] || row['NAMA'];
-            
-            if (nis && nama) {
-                nis = nis.toString().trim();
-                nama = nama.toString().trim();
-                
-                // Cari apakah siswa sudah ada di master siswa
-                let siswa = await prisma.siswa.findUnique({ where: { nis } });
-                
-                if (!siswa) {
-                    // Auto-create user and siswa
-                    const bcrypt = require('bcryptjs');
-                    const hashedPassword = await bcrypt.hash(nis, 10);
-                    const newUser = await prisma.user.create({
-                        data: {
-                            username: nis,
-                            email: `${nis}@siswa.local`,
-                            password: hashedPassword,
-                            roleId: 3, // Siswa Role ID
-                            siswa: {
-                                create: {
-                                    nis,
-                                    namaLengkap: nama,
-                                    sekolahId: 1
-                                }
-                            }
-                        },
-                        include: { siswa: true }
-                    });
-                    siswa = newUser.siswa;
-                }
+        // 1. Ambil data EnrolmentKelas saat ini beserta kelas dan tingkatnya
+        const currentEnrolment = await prisma.enrolmentKelas.findUnique({
+            where: { id: currentEnrolmentKelasId },
+            include: { masterKelas: { include: { tingkat: true } } }
+        });
 
-                // Cek apakah sudah tergabung di kelas ini
-                const existingEnrolment = await prisma.enrolmentSiswa.findFirst({
-                    where: { enrolmentKelasId, siswaId: siswa.id }
+        if (!currentEnrolment) return res.status(404).json({ status: 'error', message: 'Enrolment tidak ditemukan' });
+
+        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
+
+        // Loop data req.body yang berformat { status_1: 'naik', status_2: 'cuti' }
+        for (const [key, value] of Object.entries(req.body)) {
+            if (key.startsWith('status_') && value) {
+                const siswaId = parseInt(key.replace('status_', ''));
+                const status = value; // 'naik', 'lulus', 'cuti', 'belum_diproses'
+                
+                // Cari status string yang tepat untuk disimpan
+                let statusString = "Belum Diproses";
+                if (status === 'naik') statusString = "Naik Kelas";
+                else if (status === 'cuti') statusString = "Tidak Naik / Cuti";
+                else if (status === 'lulus') statusString = "Lulus";
+
+                // Update EnrolmentSiswa di kelas saat ini (histori dipertahankan)
+                await prisma.enrolmentSiswa.updateMany({
+                    where: { 
+                        enrolmentKelasId: currentEnrolmentKelasId,
+                        siswaId: siswaId 
+                    },
+                    data: { statusKenaikan: statusString }
                 });
 
-                if (!existingEnrolment) {
-                    await prisma.enrolmentSiswa.create({
-                        data: {
-                            enrolmentKelasId,
-                            siswaId: siswa.id,
-                            isActive: true
+                // Jika kelas ini BUKAN di TA yang sedang aktif (berarti Admin memproses kelas historis)
+                // Maka kita buatkan/pindahkan record mereka ke TA yang sedang aktif
+                if (activeTa && currentEnrolment.tahunAkademikId !== activeTa.id) {
+                    // Hapus rekam jejak anak ini di TA aktif (jika ada) untuk menghindari duplikasi
+                    // (misal admin berubah pikiran dari Tidak Naik menjadi Naik)
+                    await prisma.enrolmentSiswa.deleteMany({
+                        where: {
+                            siswaId: siswaId,
+                            enrolmentKelas: { tahunAkademikId: activeTa.id }
                         }
                     });
+
+                    if (statusString === 'Naik Kelas') {
+                        // Cari kelas berikutnya
+                        const currentTingkatName = currentEnrolment.masterKelas.tingkat ? currentEnrolment.masterKelas.tingkat.namaTingkat : null;
+                        let nextTingkatName = null;
+                        if (currentTingkatName === 'X') nextTingkatName = 'XI';
+                        else if (currentTingkatName === 'XI') nextTingkatName = 'XII';
+
+                        let nextMasterKelas = null;
+                        if (nextTingkatName) {
+                            const nextTingkat = await prisma.masterTingkat.findFirst({ where: { namaTingkat: nextTingkatName } });
+                            if (nextTingkat) {
+                                nextMasterKelas = await prisma.masterKelas.findFirst({
+                                    where: { tingkatId: nextTingkat.id, namaKelas: currentEnrolment.masterKelas.namaKelas, sekolahId: currentEnrolment.sekolahId }
+                                });
+                            }
+                        }
+
+                        if (nextMasterKelas) {
+                            let targetEnrolment = await prisma.enrolmentKelas.findFirst({
+                                where: { kelasId: nextMasterKelas.id, angkatanId: currentEnrolment.angkatanId, tahunAkademikId: activeTa.id }
+                            });
+                            if (!targetEnrolment) {
+                                targetEnrolment = await prisma.enrolmentKelas.create({
+                                    data: {
+                                        sekolahId: currentEnrolment.sekolahId,
+                                        kelasId: nextMasterKelas.id,
+                                        angkatanId: currentEnrolment.angkatanId,
+                                        tahunAkademikId: activeTa.id,
+                                        keterangan: ''
+                                    }
+                                });
+                            }
+                            await prisma.enrolmentSiswa.create({
+                                data: { siswaId: siswaId, enrolmentKelasId: targetEnrolment.id, statusKenaikan: 'Belum Diproses', isActive: true }
+                            });
+                        } else {
+                            // Jika tidak ada kelas target (misal dari kelas XII), fallback ke kelas yang sama di TA Baru
+                            let sameClassNewTa = await prisma.enrolmentKelas.findFirst({
+                                where: { kelasId: currentEnrolment.kelasId, angkatanId: currentEnrolment.angkatanId, tahunAkademikId: activeTa.id }
+                            });
+                            if (!sameClassNewTa) {
+                                sameClassNewTa = await prisma.enrolmentKelas.create({
+                                    data: {
+                                        sekolahId: currentEnrolment.sekolahId,
+                                        kelasId: currentEnrolment.kelasId,
+                                        angkatanId: currentEnrolment.angkatanId,
+                                        tahunAkademikId: activeTa.id,
+                                        keterangan: ''
+                                    }
+                                });
+                            }
+                            await prisma.enrolmentSiswa.create({
+                                data: { siswaId: siswaId, enrolmentKelasId: sameClassNewTa.id, statusKenaikan: 'Belum Diproses', isActive: true }
+                            });
+                        }
+                    } else if (statusString === 'Tidak Naik / Cuti') {
+                        // Tinggal kelas: Angkatan harus bertambah 1 (bergabung dengan adik kelas)
+                        let targetAngkatanId = currentEnrolment.angkatanId;
+                        const currentAngkatan = await prisma.masterAngkatan.findUnique({ where: { id: currentEnrolment.angkatanId } });
+                        if (currentAngkatan && currentAngkatan.nomorAngkatan) {
+                            const nextAngkatanStr = (parseInt(currentAngkatan.nomorAngkatan) + 1).toString();
+                            let nextAngkatanObj = await prisma.masterAngkatan.findFirst({
+                                where: { sekolahId: currentEnrolment.sekolahId, nomorAngkatan: nextAngkatanStr }
+                            });
+                            if (!nextAngkatanObj) {
+                                nextAngkatanObj = await prisma.masterAngkatan.create({
+                                    data: { sekolahId: currentEnrolment.sekolahId, nomorAngkatan: nextAngkatanStr, isActive: true }
+                                });
+                            }
+                            targetAngkatanId = nextAngkatanObj.id;
+                        }
+
+                        // Masukkan ke kelas yang sama di TA aktif, tapi dengan angkatan baru
+                        let targetEnrolmentTinggal = await prisma.enrolmentKelas.findFirst({
+                            where: { kelasId: currentEnrolment.kelasId, angkatanId: targetAngkatanId, tahunAkademikId: activeTa.id }
+                        });
+                        if (!targetEnrolmentTinggal) {
+                            targetEnrolmentTinggal = await prisma.enrolmentKelas.create({
+                                data: {
+                                    sekolahId: currentEnrolment.sekolahId,
+                                    kelasId: currentEnrolment.kelasId,
+                                    angkatanId: targetAngkatanId,
+                                    tahunAkademikId: activeTa.id,
+                                    keterangan: ''
+                                }
+                            });
+                        }
+                        await prisma.enrolmentSiswa.create({
+                            data: { siswaId: siswaId, enrolmentKelasId: targetEnrolmentTinggal.id, statusKenaikan: 'Belum Diproses', isActive: true }
+                        });
+                    }
+                    // Jika 'Belum Diproses' atau 'Lulus', tidak ditambahkan ke TA aktif.
                 }
             }
         }
-        
-        fs.unlinkSync(req.file.path); // Hapus file temporary
         res.status(200).json({ status: 'success' });
     } catch (error) {
-        if(req.file) fs.unlinkSync(req.file.path);
-        console.error(error);
-        res.status(500).json({ status: 'error', message: 'Gagal memproses file Excel' });
+        console.error("Error proses kenaikan:", error);
+        res.status(500).json({ status: 'error', message: 'Gagal memproses kenaikan' });
     }
 });
+
 
 // 7. Hapus Siswa dari Kelas
 router.delete('/:id/siswa/:siswaId', async (req, res) => {
