@@ -135,13 +135,27 @@ router.get('/:userId', async (req, res) => {
       take: 5
     });
 
+    // Ambil jadwal aktif
+    const jadwalAktif = await prisma.jadwalAbsensi.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        namaJadwal: true,
+        jamMasukStart: true,
+        jamMasukFinish: true,
+        jamPulang: true,
+        isLibur: true
+      }
+    });
+
     res.status(200).json({
       status: 'success',
       data: {
         hadirBulanIni: jumlahHadir,
         persentaseKehadiran: persentase,
         riwayatAbsensi: riwayatAbsensi,
-        riwayatPerizinan: riwayatPerizinan
+        riwayatPerizinan: riwayatPerizinan,
+        jadwalAktif: jadwalAktif
       }
     });
 

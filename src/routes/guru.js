@@ -77,10 +77,17 @@ router.get('/dashboard/:userId', async (req, res) => {
     const totalHadir = rekapAbsensiKelas.filter(a => a.status === 'Hadir' || a.status === 'Telat').length;
     const persentase = totalSiswa > 0 ? Math.round((totalHadir / totalSiswa) * 100) : 0;
 
-    const jadwalMengajar = [
-      { kelas: "XII RPL 1", waktu: "07:00 WIB", mapel: "Pemrograman Web", isDark: true },
-      { kelas: "XII RPL 2", waktu: "10:00 WIB", mapel: "Basis Data", isDark: false }
-    ];
+    const jadwalAktif = await prisma.jadwalAbsensi.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        namaJadwal: true,
+        jamMasukStart: true,
+        jamMasukFinish: true,
+        jamPulang: true,
+        isLibur: true
+      }
+    });
 
     res.status(200).json({
       status: 'success',
@@ -88,7 +95,7 @@ router.get('/dashboard/:userId', async (req, res) => {
         jumlahIzinPending: izinPending.length,
         persentaseKehadiranKelas: persentase,
         rekapAbsensiKelas: rekapAbsensiKelas, 
-        jadwalMengajar: jadwalMengajar
+        jadwalAktif: jadwalAktif
       }
     });
 

@@ -149,7 +149,7 @@ router.put('/:id/status', async (req, res) => {
                     let jadwal = await prisma.jadwalAbsensi.findFirst({
                         where: {
                             sekolahId: izin.siswa.sekolahId,
-                            hari: dayOfWeek,
+                            hari: { contains: dayOfWeek },
                             tanggal: null,
                             isLibur: false
                         }

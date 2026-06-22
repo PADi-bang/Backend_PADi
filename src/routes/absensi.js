@@ -135,7 +135,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
         jadwal = await prisma.jadwalAbsensi.findFirst({
             where: {
                 sekolahId: siswa.sekolahId,
-                hari: dayOfWeek,
+                hari: { contains: dayOfWeek },
                 tanggal: null, // Memastikan ini adalah jadwal berulang
                 isLibur: false
             }

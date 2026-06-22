@@ -68,7 +68,12 @@ router.post('/', async (req, res) => {
             return date;
         };
 
-        const currentHari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
+        let currentHari = '';
+        if (tipeJadwal === 'Reguler' || !tanggal) {
+            currentHari = 'Senin, Selasa, Rabu, Kamis, Jumat';
+        } else {
+            currentHari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
+        }
 
         let processedTanggal = [];
         if (tipeJadwal === 'Khusus' && tanggal) {
@@ -116,6 +121,13 @@ router.put('/:id', async (req, res) => {
             return date;
         };
 
+        let currentHari = '';
+        if (tipeJadwal === 'Reguler' || !tanggal) {
+            currentHari = 'Senin, Selasa, Rabu, Kamis, Jumat';
+        } else {
+            currentHari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
+        }
+
         let processedTanggal = [];
         if (tipeJadwal === 'Khusus' && tanggal) {
             const dates = Array.isArray(tanggal) ? tanggal : tanggal.split(',');
@@ -124,6 +136,7 @@ router.put('/:id', async (req, res) => {
 
         const updateData = {
             namaJadwal,
+            hari: currentHari,
             tanggal: processedTanggal,
         };
         
