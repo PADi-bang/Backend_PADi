@@ -23,12 +23,12 @@ router.get('/dashboard/:userId', async (req, res) => {
     const nowWIB = new Date(nowWIBString);
 
     const year = nowWIB.getFullYear();
-    const month = String(nowWIB.getMonth() + 1).padStart(2, '0');
-    const day = String(nowWIB.getDate()).padStart(2, '0');
+    const month = nowWIB.getMonth();
+    const day = nowWIB.getDate();
     
-    const todayStartWIB = new Date(`${year}-${month}-${day}T00:00:00+07:00`);
-    const tomorrowStartWIB = new Date(todayStartWIB);
-    tomorrowStartWIB.setDate(tomorrowStartWIB.getDate() + 1);
+    // Gunakan UTC Date agar sesuai dengan format Prisma @db.Date
+    const todayStartWIB = new Date(Date.UTC(year, month, day));
+    const tomorrowStartWIB = new Date(Date.UTC(year, month, day + 1));
 
     const absensiHariIni = await prisma.absensi.findMany({
       where: {

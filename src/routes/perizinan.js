@@ -67,11 +67,17 @@ router.post('/', upload.single('fileBukti'), async (req, res) => {
             fileBuktiPath = path.join('file_izin', finalFileName).replace(/\\/g, '/');
         }
 
+        // Pastikan tanggal disimpan di UTC jam 00:00:00 untuk mencegah pergeseran timezone
+        const tMulai = new Date(tanggalMulai);
+        const tSelesai = new Date(tanggalSelesai);
+        const utcMulai = new Date(Date.UTC(tMulai.getFullYear(), tMulai.getMonth(), tMulai.getDate()));
+        const utcSelesai = new Date(Date.UTC(tSelesai.getFullYear(), tSelesai.getMonth(), tSelesai.getDate()));
+
         const izinBaru = await prisma.perizinan.create({
             data: {
                 siswaId: siswa.id,
-                tanggalMulai: new Date(tanggalMulai),
-                tanggalSelesai: new Date(tanggalSelesai),
+                tanggalMulai: utcMulai,
+                tanggalSelesai: utcSelesai,
                 jenisIzin,
                 alasan,
                 // 7. Simpan path file yang sudah mencakup subfolder ke database
@@ -122,6 +128,57 @@ router.put('/:id/status', async (req, res) => {
                 disetujuiOlehId: guru ? guru.id : null
             }
         });
+
+        // Jika disetujui, buat record absensi untuk rentang tanggal tersebut
+        if (statusUpdate === 'Disetujui') {
+            const izin = await prisma.perizinan.findUnique({
+                where: { id: izinId },
+                include: { siswa: true }
+            });
+            
+            if (izin) {
+                const startDate = new Date(izin.tanggalMulai);
+                const endDate = new Date(izin.tanggalSelesai);
+                
+                // Looping dari tanggal mulai sampai tanggal selesai
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const current = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                    const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][current.getUTCDay()];
+                    
+                    // Cari jadwal reguler untuk hari tersebut
+                    let jadwal = await prisma.jadwalAbsensi.findFirst({
+                        where: {
+                            sekolahId: izin.siswa.sekolahId,
+                            hari: dayOfWeek,
+                            tanggal: null,
+                            isLibur: false
+                        }
+                    });
+                    
+                    if (jadwal) {
+                        // Cek apakah sudah ada absen untuk tanggal tersebut
+                        const existingAbsen = await prisma.absensi.findFirst({
+                            where: {
+                                siswaId: izin.siswa.id,
+                                tanggal: current
+                            }
+                        });
+                        
+                        if (!existingAbsen) {
+                            await prisma.absensi.create({
+                                data: {
+                                    siswaId: izin.siswa.id,
+                                    jadwalId: jadwal.id,
+                                    tanggal: current,
+                                    status: izin.jenisIzin === 'Sakit' ? 'Sakit' : 'Izin',
+                                    keterangan: izin.alasan
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        }
 
         res.status(200).json({ status: 'success', message: `Izin berhasil di-${statusUpdate}` });
     } catch (err) {

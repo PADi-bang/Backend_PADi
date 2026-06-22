@@ -18,8 +18,13 @@ router.get('/stats', async (req, res) => {
       const statusChart = [85, 10, 5]; 
 
       // === LOGIKA DINAMIS: TARIK SISWA BERMASALAH HARI INI ===
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      const nowWIBString = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+      const nowWIB = new Date(nowWIBString);
+      const year = nowWIB.getFullYear();
+      const month = nowWIB.getMonth();
+      const day = nowWIB.getDate();
+      
+      const startOfDay = new Date(Date.UTC(year, month, day));
 
       // Tarik siswa yang Alpha atau Telat hari ini
       const absensiBermasalah = await prisma.absensi.findMany({
