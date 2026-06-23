@@ -28,12 +28,33 @@ app.use(session({
     cookie: { secure: false } // Set ke true jika nanti production sudah pakai HTTPS
 }));
 
-app.use(express.static(publicPath)); 
-
-// --- JADWAL OTOMATIS (CRON JOBS) ---
+// app.use(express.static(publicPath)); // Dipindahkan ke bawah agar rute Web Admin dieksekusi lebih dulu
+// --- JADWAL OTOMATIS (CRON JOBS) & INIT ---
 const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const prismaCron = new PrismaClient();
+
+// Inisialisasi Admin Default
+async function initDefaultAdmin() {
+    try {
+        const exist = await prismaCron.user.findFirst({ where: { roleId: 1 } });
+        if (!exist) {
+            const password = await bcrypt.hash('admin123', 10);
+            await prismaCron.user.create({
+                data: {
+                    username: 'admin',
+                    password: password,
+                    email: 'admin@padi.com',
+                    roleId: 1,
+                    admin: { create: { namaAdmin: 'Administrator', sekolahId: 1 } }
+                }
+            });
+            console.log('[Init] Default Admin dibuat: admin / admin123');
+        }
+    } catch(err) { console.log('[Init] Gagal buat admin default', err.message); }
+}
+initDefaultAdmin();
 
 async function syncSemesterAktif() {
     try {
@@ -180,13 +201,18 @@ app.use('/api/admin/enrolment', require('./routes/enrolment'));
 
 // --- [BARU] MOUNT RUTE BROWSER WEB ADMIN (MENAMPILKAN INTERFACE EJS) ---
 // Pengguna browser laptop mengakses halaman admin lewat rute utama ini
-app.use('/admin', adminRoutes); 
+const webAdminRoutes = require('./routes/webAdmin');
+app.use(webAdminRoutes); 
 
 app.use('/api/perizinan', require('./routes/perizinan'));
 
+// --- PUBLIC PATH Diletakkan di sini ---
+// Agar aset statis (termasuk index.html Flutter jika ada) tidak memblokir rute web admin seperti / dan /login
+app.use(express.static(publicPath)); 
+
 
 // --- [DIPERBAIKI] FALLBACK ROUTE FOR FLUTTER WEB ---
-app.get('*', (req, res, next) => {
+app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   
   // Kunci Sukses Monolith: Tambahkan rute '/admin' ke dalam pengecekan bypass,
@@ -199,6 +225,11 @@ app.get('*', (req, res, next) => {
   res.sendFile(indexHtmlPath, err => {
     if (err) next();
   });
+});
+
+app.use((err, req, res, next) => {
+    console.error("EXPRESS GLOBAL ERROR:", err);
+    res.status(500).send("Global Server Error: " + err.message);
 });
 
 module.exports = app;
