@@ -62,10 +62,9 @@ router.post('/', async (req, res) => {
         // Validasi dan konversi waktu
         const parseTime = (timeStr) => {
             if (!timeStr) return null;
-            const date = new Date();
+            if (timeStr.includes('T')) return new Date(timeStr);
             const [hours, minutes] = timeStr.split(':');
-            date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-            return date;
+            return new Date(Date.UTC(1970, 0, 1, parseInt(hours), parseInt(minutes), 0));
         };
 
         let currentHari = '';
@@ -112,13 +111,9 @@ router.put('/:id', async (req, res) => {
 
         const parseTime = (timeStr) => {
             if (!timeStr) return null;
-            if (timeStr.includes('T')) {
-                return new Date(timeStr);
-            }
-            const date = new Date();
+            if (timeStr.includes('T')) return new Date(timeStr);
             const [hours, minutes] = timeStr.split(':');
-            date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-            return date;
+            return new Date(Date.UTC(1970, 0, 1, parseInt(hours), parseInt(minutes), 0));
         };
 
         let currentHari = '';

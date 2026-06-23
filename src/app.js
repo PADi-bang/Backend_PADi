@@ -100,6 +100,65 @@ cron.schedule('0 0 1 7 *', async () => {
     }
 });
 
+// 3. Fungsi untuk mengecek kedaluwarsa jadwal khusus dan kembalikan ke reguler
+async function checkAndRevertJadwalKhusus() {
+    try {
+        // Cari jadwal yang saat ini aktif
+        const activeJadwal = await prismaCron.jadwalAbsensi.findFirst({
+            where: { isActive: true }
+        });
+        
+        if (activeJadwal && activeJadwal.tanggal && activeJadwal.tanggal.length > 0) {
+            // Ini adalah jadwal khusus. Cek apakah tanggal terakhir sudah lewat
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // maxDate = tanggal paling akhir di array
+            const maxDate = new Date(Math.max(...activeJadwal.tanggal.map(d => new Date(d))));
+            maxDate.setHours(0, 0, 0, 0);
+            
+            if (maxDate < today) {
+                console.log(`[Cron/Init] Jadwal Khusus '${activeJadwal.namaJadwal}' sudah selesai. Mengembalikan ke jadwal reguler...`);
+                
+                // Ambil semua jadwal untuk mencari jadwal reguler
+                const semuaJadwal = await prismaCron.jadwalAbsensi.findMany();
+                const regulerList = semuaJadwal.filter(j => !j.tanggal || j.tanggal.length === 0);
+                
+                // Prioritaskan jadwal reguler yang bernama 'Utama', jika tidak ada ambil yang pertama
+                let regulerJadwal = regulerList.find(j => j.namaJadwal.toLowerCase().includes('utama')) || regulerList[0];
+                
+                if (regulerJadwal) {
+                    // Nonaktifkan semua jadwal
+                    await prismaCron.jadwalAbsensi.updateMany({
+                        data: { isActive: false }
+                    });
+                    
+                    // Aktifkan jadwal reguler
+                    await prismaCron.jadwalAbsensi.update({
+                        where: { id: regulerJadwal.id },
+                        data: { isActive: true }
+                    });
+                    console.log(`[Cron/Init] Berhasil mengaktifkan jadwal reguler: '${regulerJadwal.namaJadwal}'`);
+                } else {
+                    console.log(`[Cron/Init] Tidak ditemukan jadwal reguler untuk diaktifkan.`);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Cron/Init] Gagal mengecek jadwal khusus:', err.message);
+    }
+}
+
+// Jalankan pengecekan saat server baru mulai
+checkAndRevertJadwalKhusus();
+
+// 4. Cron Job: Setiap hari jam 00:01, cek apakah jadwal khusus sudah kedaluwarsa
+cron.schedule('1 0 * * *', () => {
+    console.log('[Cron] Mengecek kedaluwarsa jadwal khusus harian...');
+    checkAndRevertJadwalKhusus();
+});
+
+
 // ---> [BARU] Buka Akses Folder Uploads agar file bisa dilihat <---
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

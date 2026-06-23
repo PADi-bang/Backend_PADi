@@ -121,28 +121,41 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
 
     // Tahap 4: Validasi Jadwal Absensi
     const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][nowWIB.getDay()];
-    // 1. Cari jadwal khusus untuk tanggal hari ini terlebih dahulu
-    let jadwal = await prisma.jadwalAbsensi.findFirst({
+    
+    // Ambil HANYA jadwal yang saat ini sedang DIAKTIFKAN oleh admin
+    const jadwal = await prisma.jadwalAbsensi.findFirst({
         where: {
             sekolahId: siswa.sekolahId,
-            tanggal: { gte: todayStart, lt: tomorrowStart },
-            isLibur: false
+            isActive: true
         }
     });
 
-    // 2. Jika tidak ada jadwal khusus hari ini, gunakan jadwal reguler (berdasarkan hari, tanggal = null)
-    if (!jadwal) {
-        jadwal = await prisma.jadwalAbsensi.findFirst({
-            where: {
-                sekolahId: siswa.sekolahId,
-                hari: { contains: dayOfWeek },
-                tanggal: null, // Memastikan ini adalah jadwal berulang
-                isLibur: false
-            }
+    if (!jadwal) return res.status(404).json({ status: 'error', message: `Belum ada jadwal yang diaktifkan oleh Admin.` });
+    if (jadwal.isLibur) return res.status(403).json({ status: 'error', message: `Hari ini ditetapkan sebagai hari libur oleh Admin.` });
+
+    let berlakuHariIni = false;
+    
+    if (jadwal.tanggal && jadwal.tanggal.length > 0) {
+        // Jika ini jadwal khusus, cek apakah tanggal hari ini ada di dalam array tanggal yang diset
+        const isTodayInTanggal = jadwal.tanggal.some(d => {
+            const dateObj = new Date(d);
+            return dateObj.getFullYear() === year && 
+                   String(dateObj.getMonth() + 1).padStart(2, '0') === month && 
+                   String(dateObj.getDate()).padStart(2, '0') === day;
         });
+        if (isTodayInTanggal) berlakuHariIni = true;
+    } else {
+        // Jika ini jadwal reguler, cek apakah hari ini (Senin, Selasa, dst) ada di dalam pengaturan jadwal
+        if (jadwal.hari && jadwal.hari.includes(dayOfWeek)) {
+            berlakuHariIni = true;
+        }
     }
 
-    if (!jadwal) return res.status(404).json({ status: 'error', message: `Tidak ada jadwal aktif untuk hari ${dayOfWeek}.` });
+    if (!berlakuHariIni) {
+        // [PENTING] Hapus file sampah
+        if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah:", err));
+        return res.status(404).json({ status: 'error', message: `Jadwal aktif saat ini ('${jadwal.namaJadwal}') tidak berlaku untuk hari ini.` });
+    }
 
     // [PERBAIKAN] Gunakan Raw Query untuk mengecek absensi yang sudah ada.
     // Ini untuk menghindari masalah timezone antara Prisma ORM (DateTime) dan PostgreSQL (Date).

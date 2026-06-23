@@ -25,7 +25,7 @@ router.get('/siswa', async (req, res) => {
         }
         const siswas = await prisma.user.findMany({
             where: whereClause,
-            include: { siswa: { include: { sekolah: true } } },
+            include: { siswa: { include: { sekolah: true, masterAngkatan: true } } },
             orderBy: { id: 'desc' }
         });
         res.status(200).json({ status: 'success', data: siswas });
@@ -35,13 +35,13 @@ router.get('/siswa', async (req, res) => {
 });
 
 router.post('/siswa', async (req, res) => {
-    const { username, email, password, namaLengkap, nis, sekolahId } = req.body;
+    const { username, email, password, namaLengkap, nis, angkatanId, sekolahId } = req.body;
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = await prisma.user.create({
             data: {
                 username, email, password: hashedPassword, roleId: 3,
-                siswa: { create: { namaLengkap, nis, sekolahId: parseInt(sekolahId) || 1 } }
+                siswa: { create: { namaLengkap, nis, sekolahId: parseInt(sekolahId) || 1, angkatanId: parseInt(angkatanId) || null } }
             }
         });
         res.status(201).json({ status: 'success', data: newUser });
@@ -53,7 +53,7 @@ router.post('/siswa', async (req, res) => {
 // [BARU] EDIT SISWA
 router.put('/siswa/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
-    const { username, email, password, namaLengkap, nis } = req.body;
+    const { username, email, password, namaLengkap, nis, angkatanId } = req.body;
     try {
         let updateData = { username, email };
         if (password && password.trim() !== '') {
@@ -63,7 +63,7 @@ router.put('/siswa/:id', async (req, res) => {
             where: { id: userId },
             data: {
                 ...updateData,
-                siswa: { update: { namaLengkap, nis } }
+                siswa: { update: { namaLengkap, nis, angkatanId: parseInt(angkatanId) || null } }
             }
         });
         res.status(200).json({ status: 'success' });
@@ -112,7 +112,21 @@ router.get('/guru', async (req, res) => {
         }
         const gurus = await prisma.user.findMany({
             where: whereClause,
-            include: { guru: { include: { sekolah: true } } },
+            include: { 
+                guru: { 
+                    include: { 
+                        sekolah: true,
+                        enrolmentGuru: {
+                            where: { isActive: true },
+                            include: {
+                                enrolmentKelas: {
+                                    include: { masterKelas: true }
+                                }
+                            }
+                        }
+                    } 
+                } 
+            },
             orderBy: { id: 'desc' }
         });
         res.status(200).json({ status: 'success', data: gurus });
@@ -156,6 +170,47 @@ router.put('/guru/:id', async (req, res) => {
         res.status(200).json({ status: 'success' });
     } catch (error) {
         res.status(500).json({ status: 'error', message: 'Gagal update data guru' });
+    }
+});
+
+// [BARU] ATUR KELAS GURU
+router.post('/guru/:id/kelas', async (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { enrolmentKelasIds } = req.body;
+    
+    try {
+        const guru = await prisma.guru.findUnique({ where: { userId } });
+        if (!guru) return res.status(404).json({ status: 'error', message: 'Guru tidak ditemukan' });
+
+        // Hapus semua penugasan kelas sebelumnya untuk guru ini
+        await prisma.enrolmentGuru.deleteMany({
+            where: { guruId: guru.id }
+        });
+
+        // Jika ada kelas yang dipilih, proses penambahannya
+        if (enrolmentKelasIds) {
+            let ids = Array.isArray(enrolmentKelasIds) ? enrolmentKelasIds : [enrolmentKelasIds];
+            for (let classId of ids) {
+                const enrolmentKelasId = parseInt(classId);
+                
+                // Pastikan hanya ada 1 wali kelas per kelas
+                await prisma.enrolmentGuru.deleteMany({
+                    where: { enrolmentKelasId }
+                });
+
+                await prisma.enrolmentGuru.create({
+                    data: {
+                        enrolmentKelasId,
+                        guruId: guru.id,
+                        isActive: true
+                    }
+                });
+            }
+        }
+        res.status(200).json({ status: 'success' });
+    } catch (error) {
+        console.error("Gagal atur kelas:", error);
+        res.status(500).json({ status: 'error', message: 'Gagal mengatur kelas guru' });
     }
 });
 

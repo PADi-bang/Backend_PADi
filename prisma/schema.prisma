@@ -111,10 +111,12 @@ model Siswa {
   sekolahId   Int     @map("id_sekolah")
   namaLengkap String  @map("nama_lengkap")
   nis         String  @unique @map("NIS")
+  angkatanId  Int?    @map("id_angkatan")
   faceModel   String? @map("face_model")
 
   user           User             @relation(fields: [userId], references: [id])
   sekolah        Sekolah          @relation(fields: [sekolahId], references: [id])
+  masterAngkatan MasterAngkatan?  @relation(fields: [angkatanId], references: [id])
   enrolmentSiswa EnrolmentSiswa[]
   absensi        Absensi[]
   perizinan      Perizinan[]
@@ -169,7 +171,7 @@ model MasterAngkatan {
   nomorAngkatan String           @map("nomor_angkatan")
   isActive      Boolean          @default(true) @map("is_active")
   sekolah       Sekolah          @relation(fields: [sekolahId], references: [id])
-  enrolmentKelas EnrolmentKelas[]
+  siswas        Siswa[]
 
   @@map("master_angkatan")
 }
@@ -193,12 +195,10 @@ model EnrolmentKelas {
   id                  Int                 @id @default(autoincrement()) @map("id_enrolment_kelas")
   sekolahId           Int                 @map("id_sekolah")
   kelasId             Int                 @map("id_kelas")
-  angkatanId          Int                 @map("id_angkatan")
   tahunAkademikId     Int                 @map("id_tahun_akademik")
   keterangan          String?
   sekolah             Sekolah             @relation(fields: [sekolahId], references: [id])
   masterKelas         MasterKelas         @relation(fields: [kelasId], references: [id])
-  masterAngkatan      MasterAngkatan      @relation(fields: [angkatanId], references: [id])
   masterTahunAkademik MasterTahunAkademik @relation(fields: [tahunAkademikId], references: [id])
   enrolmentSiswa      EnrolmentSiswa[]
   enrolmentGuru       EnrolmentGuru[]

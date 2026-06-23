@@ -153,7 +153,6 @@ router.post('/kelas', async (req, res) => {
                     data: {
                         sekolahId: parseInt(sekolahId) || 1,
                         kelasId: newKelas.id,
-                        angkatanId: existingEnrolmentInSameTingkat.angkatanId,
                         tahunAkademikId: existingEnrolmentInSameTingkat.tahunAkademikId,
                         keterangan: ''
                     }
@@ -288,13 +287,11 @@ router.put('/angkatan/:id/toggle-active', async (req, res) => {
 router.delete('/angkatan/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
-        // Find enrolments related to this angkatan to cascade delete
-        const enrolments = await prisma.enrolmentKelas.findMany({ where: { angkatanId: id } });
-        for (const e of enrolments) {
-            await prisma.enrolmentSiswa.deleteMany({ where: { enrolmentKelasId: e.id } });
-            await prisma.enrolmentGuru.deleteMany({ where: { enrolmentKelasId: e.id } });
-        }
-        await prisma.enrolmentKelas.deleteMany({ where: { angkatanId: id } });
+        // Set angkatanId to null for any Siswa using this Angkatan
+        await prisma.siswa.updateMany({
+            where: { angkatanId: id },
+            data: { angkatanId: null }
+        });
 
         await prisma.masterAngkatan.delete({ where: { id } });
         res.status(200).json({ status: 'success' });
@@ -419,32 +416,18 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
                         if (existingInNewTa) continue;
 
                         if (es.statusKenaikan === 'Tidak Naik / Cuti') {
-                            // Tinggal kelas: Angkatan harus bertambah 1 (bergabung dengan adik kelas)
-                            let targetAngkatanId = oldClass.angkatanId;
-                            const currentAngkatan = await prisma.masterAngkatan.findUnique({ where: { id: oldClass.angkatanId } });
-                            if (currentAngkatan && currentAngkatan.nomorAngkatan) {
-                                const nextAngkatanStr = (parseInt(currentAngkatan.nomorAngkatan) + 1).toString();
-                                let nextAngkatanObj = await prisma.masterAngkatan.findFirst({
-                                    where: { sekolahId: ta.sekolahId, nomorAngkatan: nextAngkatanStr }
-                                });
-                                if (!nextAngkatanObj) {
-                                    nextAngkatanObj = await prisma.masterAngkatan.create({
-                                        data: { sekolahId: ta.sekolahId, nomorAngkatan: nextAngkatanStr, isActive: true }
-                                    });
-                                }
-                                targetAngkatanId = nextAngkatanObj.id;
-                            }
-
-                            // Cari/Buat kelas target (Kelas Sama, Angkatan Baru)
+                            // Tinggal kelas: Siswa dimasukkan ke kelas yang SAMA, hanya TA nya yang baru.
+                            // Angkatan milik Siswa tetap sama (tidak berubah).
+                            
+                            // Cari/Buat kelas target (Kelas Sama)
                             let targetEnrolmentTinggal = await prisma.enrolmentKelas.findFirst({
-                                where: { kelasId: oldClass.kelasId, angkatanId: targetAngkatanId, tahunAkademikId: id }
+                                where: { kelasId: oldClass.kelasId, tahunAkademikId: id }
                             });
                             if (!targetEnrolmentTinggal) {
                                 targetEnrolmentTinggal = await prisma.enrolmentKelas.create({
                                     data: {
                                         sekolahId: ta.sekolahId,
                                         kelasId: oldClass.kelasId,
-                                        angkatanId: targetAngkatanId,
                                         tahunAkademikId: id,
                                         keterangan: ''
                                     }
@@ -485,14 +468,13 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
 
                             if (nextMasterKelas) {
                                 let targetEnrolment = await prisma.enrolmentKelas.findFirst({
-                                    where: { kelasId: nextMasterKelas.id, angkatanId: oldClass.angkatanId, tahunAkademikId: id }
+                                    where: { kelasId: nextMasterKelas.id, tahunAkademikId: id }
                                 });
                                 if (!targetEnrolment) {
                                     targetEnrolment = await prisma.enrolmentKelas.create({
                                         data: {
                                             sekolahId: ta.sekolahId,
                                             kelasId: nextMasterKelas.id,
-                                            angkatanId: oldClass.angkatanId,
                                             tahunAkademikId: id,
                                             keterangan: ''
                                         }
@@ -507,16 +489,15 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
                                     }
                                 });
                             } else {
-                                // Jika kelas target tidak ada (misal dari kelas XII), letakkan di kelas yang sama di TA baru (angkatan sama)
+                                // Jika kelas target tidak ada (misal dari kelas XII), letakkan di kelas yang sama di TA baru
                                 let fallbackEnrolment = await prisma.enrolmentKelas.findFirst({
-                                    where: { kelasId: oldClass.kelasId, angkatanId: oldClass.angkatanId, tahunAkademikId: id }
+                                    where: { kelasId: oldClass.kelasId, tahunAkademikId: id }
                                 });
                                 if (!fallbackEnrolment) {
                                     fallbackEnrolment = await prisma.enrolmentKelas.create({
                                         data: {
                                             sekolahId: ta.sekolahId,
                                             kelasId: oldClass.kelasId,
-                                            angkatanId: oldClass.angkatanId,
                                             tahunAkademikId: id,
                                             keterangan: ''
                                         }
