@@ -225,6 +225,16 @@ async function main() {
   console.log('📚 Membuat relasi kelas, angkatan, dan tahun akademik...');
 
   // 7a. Buat Master Data Akademik (jika belum ada)
+  const tingkatNames = ["X", "XI", "XII"];
+  const tingkatMap = {};
+  for (const name of tingkatNames) {
+    let t = await prisma.masterTingkat.findFirst({ where: { namaTingkat: name } });
+    if (!t) {
+      t = await prisma.masterTingkat.create({ data: { namaTingkat: name } });
+    }
+    tingkatMap[name] = t.id;
+  }
+
   const tahunAkademik = await prisma.masterTahunAkademik.upsert({
     where: { id: 1 },
     update: {},
@@ -238,7 +248,7 @@ async function main() {
   const kelas = await prisma.masterKelas.upsert({
     where: { id: 1 },
     update: {},
-    create: { id: 1, sekolahId: 1, namaKelas: 'RPL 1' }
+    create: { id: 1, sekolahId: 1, namaKelas: 'RPL 1', tingkatId: tingkatMap["X"] }
   });
 
   // 7b. Buat Rombongan Belajar (Enrolment Kelas)
