@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Detail Kelas - App_PADi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="icon" type="image/png" href="/favicon.png">
+
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#006D5B',
+                        'primary-dark': '#004A3F',
+                        'primary-light': '#338A7B',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+</head>
+<body class="bg-slate-100 flex font-sans">
+    
+    <aside class="w-64 h-screen bg-[#00382E] text-white/70 p-6 flex flex-col fixed rounded-r-3xl shadow-2xl z-20">
+        <div class="flex items-center gap-3 mb-12 mt-4 pl-2">
+            <img src="/images/logo_padi.png" alt="Logo" class="w-10 h-10 object-contain drop-shadow-md">
+            <span class="text-3xl font-black text-white tracking-widest">PADi</span>
+        </div>
+        <nav class="flex-1 space-y-3">
+            <a href="/dashboard" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg> Dashboard
+            </a>
+            <a href="/daftar-siswa" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg> Daftar Siswa
+            </a>
+            <a href="/daftar-guru" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> Daftar Guru
+            </a>
+            <a href="/jadwal" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> Jadwal
+            </a>
+            <a href="/master-data" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg> Master Data
+            </a>
+            <a href="/enrolment" class="flex items-center gap-4 p-3.5 bg-primary text-white rounded-2xl shadow-lg shadow-primary/40 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg> Enrolment Kelas
+            </a>
+        </nav>
+        <div class="mt-auto mb-4">
+            <a href="/logout" class="flex justify-center items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3.5 px-4 rounded-full transition shadow-lg shadow-primary/30">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> LOGOUT
+            </a>
+        </div>
+    </aside>
+
+    <main class="flex-1 ml-64 p-8">
+        
+        <div class="mb-6 flex items-center gap-4">
+            <a href="/enrolment" class="bg-white p-2 rounded-full shadow hover:bg-gray-50 transition text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Detail Kelas: <%= detail.enrolment.masterKelas.namaKelas %></h1>
+                <p class="text-gray-500 text-sm">TA <%= detail.enrolment.masterTahunAkademik.tahunAjaran %> (<%= detail.enrolment.masterTahunAkademik.semester %>)</p>
+            </div>
+        </div>
+
+        <!-- TOP ROW: WALI KELAS & PENCARIAN -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            
+            <!-- PANEL WALI KELAS -->
+            <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col h-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">👨‍🏫 Wali Kelas</h2>
+                        <p class="text-sm text-gray-500"><%= detail.enrolment.enrolmentGuru.length > 0 ? 'Sudah Diatur' : 'Belum Diatur' %></p>
+                    </div>
+                    <button onclick="toggleModal('modalTambahGuru')" class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded-full text-xs font-bold shadow-md hover:bg-yellow-200 transition"><%= detail.enrolment.enrolmentGuru.length > 0 ? 'Ganti Wali Kelas' : '+ Atur Wali Kelas' %></button>
+                </div>
+                <div>
+                    <% if (detail.enrolment.enrolmentGuru.length > 0) { %>
+                        <% detail.enrolment.enrolmentGuru.forEach(function(eg) { %>
+                            <div class="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-gray-100">
+                                <div>
+                                    <p class="font-bold text-gray-700"><%= eg.guru.namaLengkap %></p>
+                                    <p class="font-mono text-xs text-gray-500">NIP: <%= eg.guru.nip %></p>
+                                </div>
+                                <form action="/enrolment/<%= detail.enrolment.id %>/guru/delete/<%= eg.guru.id %>" method="POST" onsubmit="return confirmDelete(event, this, 'Hapus guru ini sebagai wali kelas?');">
+                                    <button type="submit" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200">Hapus</button>
+                                </form>
+                            </div>
+                        <% }); %>
+                    <% } else { %>
+                        <div class="p-4 bg-yellow-50 text-yellow-700 rounded-xl border border-yellow-100 text-center text-sm font-bold">
+                            Wali kelas belum diatur.
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- PANEL PENCARIAN SISWA -->
+            <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col h-auto justify-center">
+                <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2 mb-2">🔍 Cari Siswa di Kelas Ini</h2>
+                <p class="text-sm text-gray-500 mb-4">Temukan siswa berdasarkan nama atau NIS dengan cepat.</p>
+                <input type="text" id="searchInput" onkeyup="filterSiswa()" placeholder="Ketik nama atau NIS..." class="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light transition shadow-inner">
+            </div>
+
+        </div>
+
+        <!-- PANEL SISWA (FULL WIDTH) -->
+        <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col h-[600px]">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">👤 Daftar Siswa</h2>
+                    <p class="text-sm text-gray-500"><%= detail.enrolment.enrolmentSiswa.length %> Siswa tergabung</p>
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" form="formKenaikanKelas" class="bg-indigo-600 text-white px-4 py-2 rounded-full text-xs font-bold shadow-md hover:bg-indigo-700 transition">💾 Simpan Status Kenaikan</button>
+                    <button onclick="toggleModal('modalTambahSiswa')" class="bg-primary text-white px-4 py-2 rounded-full text-xs font-bold shadow-md hover:bg-primary-dark transition">+ Tambah Siswa</button>
+                </div>
+            </div>
+            <form id="formKenaikanKelas" action="/enrolment/<%= detail.enrolment.id %>/proses-kenaikan" method="POST" class="overflow-y-auto flex-1 border rounded-xl" onsubmit="return confirmProses(event, this);">
+                <table class="w-full text-left" id="tableSiswa">
+                    <thead class="bg-slate-50 text-[10px] text-gray-400 uppercase tracking-wider font-bold sticky top-0">
+                        <tr>
+                            <th class="px-4 py-3">Nama Siswa</th>
+                            <th class="px-4 py-3">NIS</th>
+                            <th class="px-4 py-3 text-center">Angkatan</th>
+                            <th class="px-4 py-3 text-center">Status Kenaikan</th>
+                            <th class="px-4 py-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y text-sm">
+                        <% if (detail.enrolment.enrolmentSiswa.length > 0) { %>
+                            <% detail.enrolment.enrolmentSiswa.forEach(function(es) { %>
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 font-bold text-blue-600 hover:underline">
+                                        <a href="/daftar-siswa?search=<%= encodeURIComponent(es.siswa.namaLengkap) %>" title="Lihat detail di Daftar Siswa">
+                                            <%= es.siswa.namaLengkap %>
+                                        </a>
+                                    </td>
+                                    <td class="px-4 py-3 font-mono text-xs text-gray-500"><%= es.siswa.nis %></td>
+                                    <td class="px-4 py-3 text-center font-bold text-gray-600"><%= es.siswa.masterAngkatan ? es.siswa.masterAngkatan.nomorAngkatan : '-' %></td>
+                                    <td class="px-4 py-3 text-center">
+                                        <select name="status_<%= es.siswa.id %>" class="bg-slate-50 border border-gray-200 rounded-md px-2 py-1 text-xs outline-none focus:border-primary-light">
+                                            <option value="" <%= (!es.statusKenaikan || es.statusKenaikan === 'Belum Diproses') ? 'selected' : '' %>>Belum Diproses</option>
+                                            <% if (detail.enrolment.masterKelas.tingkat && detail.enrolment.masterKelas.tingkat.namaTingkat === 'XII') { %>
+                                                <option value="lulus" <%= es.statusKenaikan === 'Lulus' ? 'selected' : '' %>>Lulus</option>
+                                            <% } else { %>
+                                                <option value="naik" <%= es.statusKenaikan === 'Naik Kelas' ? 'selected' : '' %>>Naik Kelas</option>
+                                            <% } %>
+                                            <option value="cuti" <%= es.statusKenaikan === 'Tidak Naik / Cuti' ? 'selected' : '' %>>Tidak Naik / Cuti</option>
+                                        </select>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <button type="button" onclick="confirmDeleteIndividual('<%= detail.enrolment.id %>', '<%= es.siswa.id %>')" class="bg-red-100 text-red-600 px-2 py-1 rounded-md text-xs font-bold hover:bg-red-200">Keluarkan</button>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        <% } else { %>
+                            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500 font-bold text-sm">Belum ada siswa di kelas ini.</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </form>
+        </div>
+    </main>
+
+    <!-- MODAL TAMBAH SISWA -->
+    <div id="modalTambahSiswa" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
+            <button onclick="toggleModal('modalTambahSiswa')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Pilih Siswa</h2>
+            <form action="/enrolment/<%= detail.enrolment.id %>/siswa" method="POST" class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Pilih dari Daftar Siswa</label>
+                    <select name="siswaId" required class="w-full mt-1 bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                        <option value="">-- Pilih Siswa --</option>
+                        <% detail.allSiswa.forEach(s => { %>
+                            <option value="<%= s.id %>"><%= s.namaLengkap %> (NIS: <%= s.nis %>)</option>
+                        <% }) %>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-primary text-white font-bold rounded-xl py-3.5 mt-4 hover:bg-primary-dark">Tambahkan Siswa</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL TAMBAH GURU -->
+    <div id="modalTambahGuru" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
+            <button onclick="toggleModal('modalTambahGuru')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Pilih Wali Kelas</h2>
+            <form action="/enrolment/<%= detail.enrolment.id %>/guru" method="POST" class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Pilih dari Daftar Guru</label>
+                    <select name="guruId" required class="w-full mt-1 bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                        <option value="">-- Pilih Guru --</option>
+                        <% detail.allGuru.forEach(g => { %>
+                            <option value="<%= g.id %>"><%= g.namaLengkap %> (NIP: <%= g.nip %>)</option>
+                        <% }) %>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-yellow-400 text-yellow-900 font-bold rounded-xl py-3.5 mt-4 hover:bg-yellow-500">Simpan Wali Kelas</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleModal(modalID) {
+            const modal = document.getElementById(modalID);
+            modal.classList.toggle('hidden');
+        }
+
+        function confirmDelete(e, form, text) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Konfirmasi', text: text, icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Lanjutkan!'
+            }).then((result) => {
+                if (result.isConfirmed) form.submit();
+            });
+        }
+        function confirmProses(e, form) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Proses Status Kenaikan?',
+                text: 'Siswa yang terpilih Naik Kelas atau Lulus akan dipindahkan, sedangkan yang Cuti/Tidak Naik akan dinonaktifkan dari kelas ini.',
+                icon: 'question',
+                showCancelButton: true, confirmButtonColor: '#4f46e5', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Proses Sekarang!'
+            }).then((result) => {
+                if (result.isConfirmed) form.submit();
+            });
+        }
+        function confirmDeleteIndividual(kelasId, siswaId) {
+            Swal.fire({
+                title: 'Konfirmasi', text: 'Keluarkan siswa ini dari kelas?', icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Keluarkan!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/enrolment/${kelasId}/siswa/delete/${siswaId}`;
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        }
+        function filterSiswa() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#tableSiswa tbody tr');
+            rows.forEach(row => {
+                if (row.children.length > 1) { // abaikan baris "Belum ada siswa"
+                    const nama = row.children[0].innerText.toLowerCase();
+                    const nis = row.children[1].innerText.toLowerCase();
+                    if (nama.includes(input) || nis.includes(input)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>
+

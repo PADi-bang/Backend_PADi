@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Daftar Siswa - App_PADi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="icon" type="image/png" href="/favicon.png">
+
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#006D5B',
+                        'primary-dark': '#004A3F',
+                        'primary-light': '#338A7B',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+</head>
+<body class="bg-slate-100 flex font-sans">
+    
+    <aside class="w-64 h-screen bg-[#00382E] text-white/70 p-6 flex flex-col fixed rounded-r-3xl shadow-2xl z-20">
+        <div class="flex items-center gap-3 mb-12 mt-4 pl-2">
+            <img src="/images/logo_padi.png" alt="Logo" class="w-10 h-10 object-contain drop-shadow-md">
+            <span class="text-3xl font-black text-white tracking-widest">PADi</span>
+        </div>
+        <nav class="flex-1 space-y-3">
+            <a href="/dashboard" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg> Dashboard
+            </a>
+            <a href="/daftar-siswa" class="flex items-center gap-4 p-3.5 bg-primary text-white rounded-2xl shadow-lg shadow-primary/40 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg> Daftar Siswa
+            </a>
+            <a href="/daftar-guru" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> Daftar Guru
+            </a>
+            <a href="/jadwal" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> Jadwal
+            </a>
+            <a href="/master-data" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg> Master Data
+            </a>
+            <a href="/enrolment" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg> Enrolment Kelas
+            </a>
+        </nav>
+        <div class="mt-auto mb-4">
+            <a href="/logout" class="flex justify-center items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3.5 px-4 rounded-full transition shadow-lg shadow-primary/30">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> LOGOUT
+            </a>
+        </div>
+    </aside>
+
+    <main class="flex-1 ml-64 p-8">
+        
+        <div class="bg-primary rounded-3xl p-4 flex justify-between items-center text-white mb-8 shadow-lg shadow-primary/20">
+            <form action="/daftar-siswa" method="GET" class="relative w-96 ml-2">
+                <span class="absolute left-4 top-2.5 opacity-50">🔍</span>
+                <input type="text" name="search" value="<%= typeof search !== 'undefined' ? search : '' %>" placeholder="Cari siswa, NIS, atau email..." class="w-full bg-primary-dark/50 text-white placeholder-blue-200 border border-primary-light/50 rounded-full pl-12 pr-4 py-2 outline-none focus:ring-2 focus:ring-white/50 text-sm transition">
+            </form>
+
+            <div class="flex items-center gap-4 pr-4">
+                <button onclick="toggleModal('modalImportSiswa')" class="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-5 py-2 rounded-full text-xs font-bold shadow-md transition">📥 Import CSV/Excel</button>
+                <button onclick="toggleModal('modalTambahSiswa')" class="bg-white text-primary px-5 py-2 rounded-full text-xs font-bold shadow-md hover:bg-gray-100 transition">+ Tambah Siswa</button>
+                <div class="flex items-center gap-3 border-l border-primary-light/50 pl-6 cursor-pointer">
+                    <span class="text-sm font-bold tracking-wide uppercase">Admin PADI</span>
+                    <div class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-primary font-bold text-xs">AD</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center">
+                <div>
+                    <p class="text-gray-400 text-xs font-bold uppercase">Total Siswa</p>
+                    <h3 class="text-3xl font-bold text-gray-800 mt-1"><%= siswas ? siswas.length : 0 %></h3>
+                </div>
+                <div class="bg-slate-100 border p-4 rounded-full text-2xl">👥</div>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center">
+                <div>
+                    <p class="text-gray-400 text-xs font-bold uppercase">Siswa Aktif</p>
+                    <h3 class="text-3xl font-bold text-gray-800 mt-1"><%= siswas ? siswas.length : 0 %></h3>
+                </div>
+                <div class="bg-green-50 border border-green-100 p-4 rounded-full text-2xl text-green-500">✅</div>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center">
+                <div>
+                    <p class="text-gray-400 text-xs font-bold uppercase">Dalam Izin</p>
+                    <h3 class="text-3xl font-bold text-gray-800 mt-1">0</h3>
+                </div>
+                <div class="bg-orange-50 border border-orange-100 p-4 rounded-full text-2xl text-orange-500">🌙</div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 text-[10px] text-gray-400 uppercase tracking-wider font-bold">
+                    <tr>
+                        <th class="px-8 py-4">Siswa</th>
+                        <th class="px-6 py-4">NIS</th>
+                        <th class="px-6 py-4">Angkatan</th>
+                        <th class="px-6 py-4">Kelas</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4 text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y text-sm">
+                    <% if (typeof siswas !== 'undefined' && siswas.length > 0) { %>
+                        <% siswas.forEach(function(user) { %>
+                            <tr class="hover:bg-slate-50 transition">
+                                <td class="px-8 py-4 flex items-center gap-4">
+                                    <div class="w-10 h-10 bg-primary/20 text-primary font-bold rounded-full flex items-center justify-center">
+                                        <%= user.siswa && user.siswa.namaLengkap ? user.siswa.namaLengkap.substring(0, 2).toUpperCase() : 'U' %>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-gray-800"><%= user.siswa ? user.siswa.namaLengkap : 'Tanpa Nama' %></p>
+                                        <p class="text-xs text-gray-400"><%= user.email %></p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500 font-mono text-xs"><%= user.siswa ? user.siswa.nis : '-' %></td>
+                                <td class="px-6 py-4 font-bold text-gray-700"><%= user.siswa && user.siswa.masterAngkatan ? user.siswa.masterAngkatan.nomorAngkatan : '-' %></td>
+                                <td class="px-6 py-4">
+                                    <% 
+                                        let namaKelas = '-';
+                                        if (user.siswa && user.siswa.enrolmentSiswa && user.siswa.enrolmentSiswa.length > 0) {
+                                            const activeEnrol = user.siswa.enrolmentSiswa.find(e => e.isActive);
+                                            if (activeEnrol && activeEnrol.enrolmentKelas && activeEnrol.enrolmentKelas.masterKelas) {
+                                                const mk = activeEnrol.enrolmentKelas.masterKelas;
+                                                namaKelas = mk.tingkat ? `${mk.tingkat.namaTingkat} ${mk.namaKelas}` : mk.namaKelas;
+                                            }
+                                        }
+                                    %>
+                                    <span class="bg-slate-100 border text-gray-600 px-3 py-1.5 rounded-lg text-[10px] font-bold">
+                                        <%= namaKelas %>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4"><span class="text-green-500 font-bold text-xs flex items-center gap-1">🔴 Aktif</span></td>
+                                <td class="px-6 py-4 flex justify-center gap-2">
+<button onclick="bukaEditSiswa('<%= user.id %>', '<%= user.siswa ? user.siswa.namaLengkap : '' %>', '<%= user.siswa ? user.siswa.nis : '' %>', '<%= user.username %>', '<%= user.email %>', '<%= user.siswa ? user.siswa.angkatanId : '' %>')" class="bg-primary/20 text-primary px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-primary/30 transition">Edit</button>
+                                    
+                                    <form action="/daftar-siswa/delete/<%= user.id %>" method="POST" class="inline" onsubmit="return confirmDelete(event, this);">
+                                        <button type="submit" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200 transition">Hapus</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    <% } else { %>
+                        <tr><td colspan="5" class="px-8 py-8 text-center text-gray-500 font-bold">Tidak ada data siswa.</td></tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <div id="modalTambahSiswa" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
+            <button onclick="toggleModal('modalTambahSiswa')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Tambah Siswa</h2>
+            <form action="/daftar-siswa" method="POST" class="space-y-4">
+                <input type="text" name="namaLengkap" placeholder="Nama Lengkap" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="text" name="nis" placeholder="NIS" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                    <input type="text" name="username" placeholder="Username" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                </div>
+<input type="email" name="email" placeholder="Email" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <input type="password" name="password" placeholder="Password" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <select name="angkatanId" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                    <option value="">-- Pilih Angkatan --</option>
+                    <% if (typeof masterAngkatan !== 'undefined') { %>
+                        <% masterAngkatan.forEach(a => { %>
+                            <option value="<%= a.id %>"><%= a.nomorAngkatan %></option>
+                        <% }) %>
+                    <% } %>
+                </select>
+                <input type="hidden" name="sekolahId" value="1">
+                <button type="submit" class="w-full bg-primary text-white font-bold rounded-xl py-3.5 mt-4 hover:bg-primary-dark">Simpan Data</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditSiswa" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
+            <button onclick="toggleModal('modalEditSiswa')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Edit Siswa</h2>
+            <form id="formEditSiswa" method="POST" class="space-y-4">
+                <input type="text" id="editNama" name="namaLengkap" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="text" id="editNis" name="nis" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                    <input type="text" id="editUsername" name="username" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                </div>
+<input type="email" id="editEmail" name="email" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <input type="password" name="password" placeholder="Kosongkan jika tidak ingin ganti sandi" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <select name="angkatanId" id="editAngkatanId" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                    <option value="">-- Pilih Angkatan --</option>
+                    <% if (typeof masterAngkatan !== 'undefined') { %>
+                        <% masterAngkatan.forEach(a => { %>
+                            <option value="<%= a.id %>"><%= a.nomorAngkatan %></option>
+                        <% }) %>
+                    <% } %>
+                </select>
+                <button type="submit" class="w-full bg-primary text-white font-bold rounded-xl py-3.5 mt-4 hover:bg-primary-dark">Update Data</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL IMPORT SISWA -->
+    <div id="modalImportSiswa" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
+            <button onclick="toggleModal('modalImportSiswa')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Import Masal Siswa</h2>
+            <p class="text-xs text-gray-500 mb-4">Unggah file Excel (.xlsx, .xls) atau CSV dengan urutan/header kolom:<br><strong class="text-primary font-mono bg-slate-50 px-1.5 py-1 rounded block mt-2 text-center text-[11px]">nama, nis, angkatan, kelas, email, password</strong></p>
+            
+            <div class="mb-6 text-center">
+                <a href="/template_import_siswa.csv" download class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-gray-700 hover:text-gray-900 px-4 py-2 rounded-xl text-xs font-bold transition">
+                    📥 Download Template CSV Contoh
+                </a>
+            </div>
+            
+            <form action="/daftar-siswa/upload" method="POST" enctype="multipart/form-data" class="space-y-6">
+                <div class="border-2 border-dashed border-gray-200 hover:border-primary rounded-2xl p-6 text-center cursor-pointer transition relative">
+                    <input type="file" name="file" accept=".xlsx, .xls, .csv" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="updateFileName(this)">
+                    <div id="uploadPlaceholder" class="space-y-2">
+                        <div class="text-4xl text-gray-300">📊</div>
+                        <p class="text-sm font-semibold text-gray-600">Pilih file untuk diunggah</p>
+                        <p class="text-xs text-gray-400">Mendukung format .xlsx, .xls, .csv</p>
+                    </div>
+                    <div id="uploadFileInfo" class="hidden space-y-2">
+                        <div class="text-4xl text-primary">📄</div>
+                        <p id="uploadFileName" class="text-sm font-bold text-gray-800 truncate px-4"></p>
+                        <p class="text-xs text-primary-light hover:underline">Ganti file</p>
+                    </div>
+                </div>
+                
+                <button type="submit" class="w-full bg-primary text-white font-bold rounded-xl py-3.5 hover:bg-primary-dark shadow-lg shadow-primary/30 transition">Mulai Impor</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleModal(modalID) {
+            const modal = document.getElementById(modalID);
+            modal.classList.toggle('hidden');
+        }
+
+        function updateFileName(input) {
+            const placeholder = document.getElementById('uploadPlaceholder');
+            const fileInfo = document.getElementById('uploadFileInfo');
+            const fileName = document.getElementById('uploadFileName');
+            
+            if (input.files && input.files.length > 0) {
+                placeholder.classList.add('hidden');
+                fileInfo.classList.remove('hidden');
+                fileName.textContent = input.files[0].name;
+            } else {
+                placeholder.classList.remove('hidden');
+                fileInfo.classList.add('hidden');
+                fileName.textContent = '';
+            }
+        }
+
+        function bukaEditSiswa(id, nama, nis, username, email, angkatanId) {
+            document.getElementById('formEditSiswa').action = '/daftar-siswa/edit/' + id;
+            document.getElementById('editNama').value = nama;
+            document.getElementById('editNis').value = nis;
+            document.getElementById('editUsername').value = username;
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editAngkatanId').value = angkatanId || '';
+            toggleModal('modalEditSiswa');
+        }
+
+        function confirmDelete(e, form) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Hapus Siswa?', text: "Semua riwayat absen siswa ini akan ikut terhapus permanen!", icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!'
+            }).then((result) => {
+                if (result.isConfirmed) form.submit();
+            });
+        }
+
+        // Handle Query Parameters and Session Import Errors on Page Load
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const successMsg = urlParams.get('success');
+            const errorMsg = urlParams.get('error');
+            const hasWarning = urlParams.get('warning');
+
+            // EJS injects importErrors here
+            const importErrors = <%- importErrors ? JSON.stringify(importErrors) : 'null' %>;
+
+            if (successMsg) {
+                if (hasWarning && importErrors && importErrors.length > 0) {
+                    let errorListHtml = '<div class="text-left max-h-40 overflow-y-auto text-xs space-y-1 bg-slate-50 p-3 rounded-lg border border-yellow-200 mt-2">';
+                    importErrors.forEach(err => {
+                        if (typeof err === 'string') {
+                            errorListHtml += `<p class="text-yellow-700 font-semibold">• ${err}</p>`;
+                        } else {
+                            errorListHtml += `<p class="text-yellow-700 font-semibold">• Baris ${err.row}: ${err.reason} (${err.details || ''})</p>`;
+                        }
+                    });
+                    errorListHtml += '</div>';
+
+                    Swal.fire({
+                        title: 'Impor Selesai dengan Peringatan',
+                        html: `<p class="text-sm text-gray-600 mb-2">${successMsg}</p><p class="text-xs font-bold text-gray-500 mb-1">Daftar baris yang dilewati / bermasalah:</p>${errorListHtml}`,
+                        icon: 'warning',
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#006D5B'
+                    }).then(() => {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        text: successMsg,
+                        icon: 'success',
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#006D5B'
+                    }).then(() => {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    });
+                }
+            } else if (errorMsg) {
+                Swal.fire({
+                    title: 'Gagal!',
+                    text: errorMsg.replace(/_/g, ' '),
+                    icon: 'error',
+                    confirmButtonText: 'Tutup',
+                    confirmButtonColor: '#ef4444'
+                }).then(() => {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                });
+            }
+        });
+    </script>
+
+    
+
+    
+
+
+    </body>
+</html>

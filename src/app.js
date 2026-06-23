@@ -2,24 +2,39 @@
 
 const express = require('express');
 const cors = require('cors');
-const path = require('path'); // Tambahan untuk path
+const path = require('path'); 
+const session = require('express-session'); // ---> [BARU] Tambahan untuk session login admin
 const dashboardRoutes = require('./routes/dashboard');
 const guruRoutes = require('./routes/guru');
 const app = express();
 
+const publicPath = path.join(__dirname, '../public');
+
+// --- [BARU] KONFIGURASI TEMPLATE ENGINE EJS ---
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '../views')); // Menunjuk ke folder views di luar folder src
+
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Untuk parsing body JSON
-app.use(express.urlencoded({ limit: '50mb', extended: true })); // Untuk parsing body URL-encoded
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' })); 
+app.use(express.urlencoded({ limit: '50mb', extended: true })); 
+
+// --- [BARU] MIDDLEWARE SESSION ---
+// Diperlukan untuk menyimpan status login user admin di browser
+app.use(session({
+    secret: 'padi-geofencing-secret-key-xyz',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false } // Set ke true jika nanti production sudah pakai HTTPS
+}));
+
+app.use(express.static(publicPath)); 
 
 // --- JADWAL OTOMATIS (CRON JOBS) ---
 const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
 const prismaCron = new PrismaClient();
 
-// Fungsi mengecek semester aktif dan update semua Tahun Akademik yg aktif
 async function syncSemesterAktif() {
     try {
         const bulanSekarang = new Date().getMonth() + 1;
@@ -43,7 +58,6 @@ async function syncSemesterAktif() {
 
         const semesterHarusnya = isGanjil ? 'Ganjil' : 'Genap';
         
-        // Update semua TA aktif
         await prismaCron.masterTahunAkademik.updateMany({
             where: { isActive: true },
             data: { semester: semesterHarusnya }
@@ -54,37 +68,31 @@ async function syncSemesterAktif() {
     }
 }
 
-// 1. Cron Job: Setiap tanggal 1 setiap bulan, cek dan update semester
 cron.schedule('0 0 1 * *', () => {
     console.log('[Cron] Menjalankan pengecekan pergantian semester...');
     syncSemesterAktif();
 });
 
-// 2. Cron Job: Setiap tanggal 1 Juli, otomatis tambah Angkatan baru dan nonaktifkan angkatan tertua (jika lebih dari 3)
 cron.schedule('0 0 1 7 *', async () => {
     try {
         console.log('[Cron] Menjalankan pengecekan angkatan baru...');
         const tahunSekarang = new Date().getFullYear();
         
-        // Cek apakah angkatan tahun ini sudah ada
         const existing = await prismaCron.masterAngkatan.findFirst({
             where: { nomorAngkatan: tahunSekarang.toString() }
         });
         
         if (!existing) {
-            // Buat angkatan baru
             await prismaCron.masterAngkatan.create({
                 data: { nomorAngkatan: tahunSekarang.toString(), sekolahId: 1, isActive: true }
             });
             console.log(`[Cron] Berhasil menambah angkatan baru: ${tahunSekarang}`);
             
-            // Ambil semua angkatan yang aktif
             const activeAngkatans = await prismaCron.masterAngkatan.findMany({
                 where: { isActive: true },
                 orderBy: { nomorAngkatan: 'desc' }
             });
             
-            // Jika ada lebih dari 4 yang aktif, nonaktifkan sisanya (yang lebih tua)
             if (activeAngkatans.length > 4) {
                 for (let i = 4; i < activeAngkatans.length; i++) {
                     await prismaCron.masterAngkatan.update({
@@ -100,40 +108,32 @@ cron.schedule('0 0 1 7 *', async () => {
     }
 });
 
-// 3. Fungsi untuk mengecek kedaluwarsa jadwal khusus dan kembalikan ke reguler
 async function checkAndRevertJadwalKhusus() {
     try {
-        // Cari jadwal yang saat ini aktif
         const activeJadwal = await prismaCron.jadwalAbsensi.findFirst({
             where: { isActive: true }
         });
         
         if (activeJadwal && activeJadwal.tanggal && activeJadwal.tanggal.length > 0) {
-            // Ini adalah jadwal khusus. Cek apakah tanggal terakhir sudah lewat
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
-            // maxDate = tanggal paling akhir di array
             const maxDate = new Date(Math.max(...activeJadwal.tanggal.map(d => new Date(d))));
             maxDate.setHours(0, 0, 0, 0);
             
             if (maxDate < today) {
                 console.log(`[Cron/Init] Jadwal Khusus '${activeJadwal.namaJadwal}' sudah selesai. Mengembalikan ke jadwal reguler...`);
                 
-                // Ambil semua jadwal untuk mencari jadwal reguler
                 const semuaJadwal = await prismaCron.jadwalAbsensi.findMany();
                 const regulerList = semuaJadwal.filter(j => !j.tanggal || j.tanggal.length === 0);
                 
-                // Prioritaskan jadwal reguler yang bernama 'Utama', jika tidak ada ambil yang pertama
                 let regulerJadwal = regulerList.find(j => j.namaJadwal.toLowerCase().includes('utama')) || regulerList[0];
                 
                 if (regulerJadwal) {
-                    // Nonaktifkan semua jadwal
                     await prismaCron.jadwalAbsensi.updateMany({
                         data: { isActive: false }
                     });
                     
-                    // Aktifkan jadwal reguler
                     await prismaCron.jadwalAbsensi.update({
                         where: { id: regulerJadwal.id },
                         data: { isActive: true }
@@ -149,21 +149,18 @@ async function checkAndRevertJadwalKhusus() {
     }
 }
 
-// Jalankan pengecekan saat server baru mulai
 checkAndRevertJadwalKhusus();
 
-// 4. Cron Job: Setiap hari jam 00:01, cek apakah jadwal khusus sudah kedaluwarsa
 cron.schedule('1 0 * * *', () => {
     console.log('[Cron] Mengecek kedaluwarsa jadwal khusus harian...');
     checkAndRevertJadwalKhusus();
 });
 
-
-// ---> [BARU] Buka Akses Folder Uploads agar file bisa dilihat <---
+// Buka Akses Folder Uploads agar file bisa dilihat
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+
 // --- Pendaftaran Rute ---
-// Impor file-file rute Anda di sini
 const authRoutes = require('./routes/auth');
 const absensiRoutes = require('./routes/absensi');
 
@@ -175,19 +172,33 @@ app.use('/api/absensi', absensiRoutes);
 const jadwalRoutes = require('./routes/jadwal');
 app.use('/api/jadwal', jadwalRoutes);
 
-// ---> TAMBAHAN RUTE ADMIN UNTUK FITUR CRUD & SEARCH <---
+// TAMBAHAN RUTE ADMIN UNTUK FITUR CRUD & SEARCH
 const adminRoutes = require('./routes/admin');
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/master', require('./routes/master'));
 app.use('/api/admin/enrolment', require('./routes/enrolment'));
-app.use('/api/guru', guruRoutes);
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/absensi', require('./routes/absensi'));
-app.use('/api/jadwal', require('./routes/jadwal'));
-app.use('/api/admin', require('./routes/admin'));
 
-// ---> [BARU] RUTE PERIZINAN <---
+// --- [BARU] MOUNT RUTE BROWSER WEB ADMIN (MENAMPILKAN INTERFACE EJS) ---
+// Pengguna browser laptop mengakses halaman admin lewat rute utama ini
+app.use('/admin', adminRoutes); 
+
 app.use('/api/perizinan', require('./routes/perizinan'));
+
+
+// --- [DIPERBAIKI] FALLBACK ROUTE FOR FLUTTER WEB ---
+app.get('*', (req, res, next) => {
+  if (req.method !== 'GET') return next();
+  
+  // Kunci Sukses Monolith: Tambahkan rute '/admin' ke dalam pengecekan bypass,
+  // agar request halaman admin tidak tidak sengaja "tertelan" oleh file index.html milik Flutter Web.
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/admin')) {
+      return next();
+  }
+
+  const indexHtmlPath = path.join(publicPath, 'index.html');
+  res.sendFile(indexHtmlPath, err => {
+    if (err) next();
+  });
+});
 
 module.exports = app;

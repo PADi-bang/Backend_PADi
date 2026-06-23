@@ -4,7 +4,7 @@
   "description": "",
   "main": "src/app.js",
   "scripts": {
-    "start": "node src/app.js",
+    "start": "node index.js",
     "init-db": "node init-db.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -18,7 +18,9 @@
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "ejs": "^6.0.1",
     "express": "^5.2.1",
+    "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.3",
     "knex": "^3.2.10",
     "multer": "^2.1.1",

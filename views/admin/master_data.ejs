@@ -1,0 +1,333 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Master Data - App_PADi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="icon" type="image/png" href="/favicon.png">
+
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#006D5B',
+                        'primary-dark': '#004A3F',
+                        'primary-light': '#338A7B',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+</head>
+<body class="bg-slate-100 flex font-sans">
+    
+    <aside class="w-64 h-screen bg-[#00382E] text-white/70 p-6 flex flex-col fixed rounded-r-3xl shadow-2xl z-20">
+        <div class="flex items-center gap-3 mb-12 mt-4 pl-2">
+            <img src="/images/logo_padi.png" alt="Logo" class="w-10 h-10 object-contain drop-shadow-md">
+            <span class="text-3xl font-black text-white tracking-widest">PADi</span>
+        </div>
+        <nav class="flex-1 space-y-3">
+            <a href="/dashboard" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg> Dashboard
+            </a>
+            <a href="/daftar-siswa" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg> Daftar Siswa
+            </a>
+            <a href="/daftar-guru" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> Daftar Guru
+            </a>
+            <a href="/jadwal" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> Jadwal
+            </a>
+            <a href="/master-data" class="flex items-center gap-4 p-3.5 bg-primary text-white rounded-2xl shadow-lg shadow-primary/40 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg> Master Data
+            </a>
+            <a href="/enrolment" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg> Enrolment Kelas
+            </a>
+        </nav>
+        <div class="mt-auto mb-4">
+            <a href="/logout" class="flex justify-center items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3.5 px-4 rounded-full transition shadow-lg shadow-primary/30">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> LOGOUT
+            </a>
+        </div>
+    </aside>
+
+    <main class="flex-1 ml-64 p-8">
+        <div class="bg-primary rounded-3xl p-4 flex justify-between items-center text-white mb-8 shadow-lg shadow-primary/20">
+            <h1 class="text-2xl font-bold ml-4">Pengelolaan Master Data</h1>
+            <div class="flex items-center gap-6 pr-4">
+                <div class="flex items-center gap-3 border-l border-primary-light/50 pl-6 cursor-pointer">
+                    <span class="text-sm font-bold tracking-wide uppercase">Admin PADI</span>
+                    <div class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-primary font-bold text-xs">AD</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8">
+            <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">⚙️ Pengaturan Sistem</h2>
+            <form action="/master-data/pengaturan" method="POST" class="flex flex-col gap-4">
+                <div class="flex flex-wrap gap-4 items-end">
+                    <div class="flex flex-col gap-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Mulai Semester Ganjil</label>
+                        <div class="flex gap-2">
+                            <select name="tanggalGanjil" class="bg-slate-50 border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-light">
+                                <% for(let i=1; i<=31; i++) { %>
+                                    <option value="<%= i %>" <%= (typeof pengaturan !== 'undefined' && pengaturan.tanggalGanjil === i) ? 'selected' : '' %>><%= i %></option>
+                                <% } %>
+                            </select>
+                            <select name="bulanGanjil" class="bg-slate-50 border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-light">
+                                <% const namaBulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']; %>
+                                <% for(let i=1; i<=12; i++) { %>
+                                    <option value="<%= i %>" <%= (typeof pengaturan !== 'undefined' && pengaturan.bulanGanjil === i) ? 'selected' : '' %>><%= namaBulan[i-1] %></option>
+                                <% } %>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col gap-1 ml-4">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Mulai Semester Genap</label>
+                        <div class="flex gap-2">
+                            <select name="tanggalGenap" class="bg-slate-50 border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-light">
+                                <% for(let i=1; i<=31; i++) { %>
+                                    <option value="<%= i %>" <%= (typeof pengaturan !== 'undefined' && pengaturan.tanggalGenap === i) ? 'selected' : '' %>><%= i %></option>
+                                <% } %>
+                            </select>
+                            <select name="bulanGenap" class="bg-slate-50 border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-light">
+                                <% for(let i=1; i<=12; i++) { %>
+                                    <option value="<%= i %>" <%= (typeof pengaturan !== 'undefined' && pengaturan.bulanGenap === i) ? 'selected' : '' %>><%= namaBulan[i-1] %></option>
+                                <% } %>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="bg-gray-800 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-black transition ml-auto">Simpan</button>
+                </div>
+            </form>
+            <p class="text-[10px] text-gray-400 mt-3">* Pengaturan ini digunakan oleh sistem untuk otomatis menentukan semester ganjil/genap secara berkelanjutan tanpa batasan tahun.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            <!-- MASTER KELAS -->
+            <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col h-[500px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">🏫 Master Kelas</h2>
+                    <button onclick="toggleModal('modalTambahKelas')" class="bg-primary/20 text-primary px-3 py-1.5 rounded-full text-xs font-bold shadow-md hover:bg-primary/30 transition">+ Tambah</button>
+                </div>
+                <div class="mb-4">
+                    <input type="text" id="searchKelas" onkeyup="filterKelas()" placeholder="Cari Nama Kelas..." class="w-full bg-slate-50 border rounded-xl px-4 py-2 text-sm outline-none focus:border-primary-light">
+                </div>
+                <div class="overflow-y-auto flex-1 border rounded-xl">
+                    <table class="w-full text-left" id="tableKelas">
+                        <thead class="bg-slate-50 text-[10px] text-gray-400 uppercase tracking-wider font-bold sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3">Nama Kelas</th>
+                                <th class="px-4 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y text-sm">
+                            <% if (typeof kelas !== 'undefined' && kelas.length > 0) { %>
+                                <% kelas.forEach(function(k) { %>
+                                    <tr class="hover:bg-slate-50 kelas-row">
+                                        <td class="px-4 py-3 font-bold text-gray-700 kelas-name"><%= k.namaGroup %></td>
+                                        <td class="px-4 py-3 text-center">
+                                            <form action="/master-data/kelas/delete-group/<%= encodeURIComponent(k.namaGroup) %>" method="POST" onsubmit="return confirmDelete(event, this, 'Semua tingkat untuk kelas ini akan dihapus permanen!');">
+                                                <button type="submit" class="bg-red-100 text-red-600 px-2 py-1 rounded-md text-xs font-bold hover:bg-red-200">Hapus</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr><td colspan="2" class="px-4 py-6 text-center text-gray-500 font-bold text-xs">Belum ada data.</td></tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- MASTER ANGKATAN -->
+            <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col h-[500px]">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">🎓 Master Angkatan</h2>
+                    <button onclick="toggleModal('modalTambahAngkatan')" class="bg-primary/20 text-primary px-3 py-1.5 rounded-full text-xs font-bold shadow-md hover:bg-primary/30 transition">+ Tambah</button>
+                </div>
+                <div class="overflow-y-auto flex-1 border rounded-xl">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 text-[10px] text-gray-400 uppercase tracking-wider font-bold sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3">Angkatan</th>
+                                <th class="px-4 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y text-sm">
+                            <% if (typeof angkatan !== 'undefined' && angkatan.length > 0) { %>
+                                <% angkatan.forEach(function(a) { %>
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-4 py-3 font-bold text-gray-700"><%= a.nomorAngkatan %></td>
+                                        <td class="px-4 py-3 text-center">
+                                            <form action="/master-data/angkatan/delete/<%= a.id %>" method="POST" onsubmit="return confirmDelete(event, this, 'Angkatan ini akan dihapus permanen!');">
+                                                <button type="submit" class="bg-red-100 text-red-600 px-2 py-1 rounded-md text-xs font-bold hover:bg-red-200">Hapus</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr><td colspan="2" class="px-4 py-6 text-center text-gray-500 font-bold text-xs">Belum ada data.</td></tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- MASTER TAHUN AKADEMIK -->
+            <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col h-[500px]">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">🗓️ Tahun Akademik</h2>
+                    <button onclick="toggleModal('modalTambahTA')" class="bg-primary/20 text-primary px-3 py-1.5 rounded-full text-xs font-bold shadow-md hover:bg-primary/30 transition">+ Tambah</button>
+                </div>
+                <div class="overflow-y-auto flex-1 border rounded-xl">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 text-[10px] text-gray-400 uppercase tracking-wider font-bold sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3">Periode</th>
+                                <th class="px-4 py-3 text-center">Status</th>
+                                <th class="px-4 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y text-sm">
+                            <% if (typeof tahunAkademik !== 'undefined' && tahunAkademik.length > 0) { %>
+                                <% tahunAkademik.forEach(function(ta) { %>
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-4 py-3 font-bold text-gray-700"><%= ta.tahunAjaran %></td>
+                                        <td class="px-4 py-3 text-center">
+                                            <% if(ta.isActive) { %>
+                                                <form action="/master-data/tahun-akademik/activate/<%= ta.id %>" method="POST" class="inline">
+                                                    <button type="submit" class="bg-green-100 text-green-600 px-2 py-1 rounded-md text-[10px] font-bold hover:bg-green-200">Aktif</button>
+                                                </form>
+                                            <% } else { %>
+                                                <form action="/master-data/tahun-akademik/activate/<%= ta.id %>" method="POST" class="inline">
+                                                    <button type="submit" class="bg-gray-100 text-gray-500 px-2 py-1 rounded-md text-[10px] font-bold hover:bg-gray-200">Nonaktif</button>
+                                                </form>
+                                            <% } %>
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            <form action="/master-data/tahun-akademik/delete/<%= ta.id %>" method="POST" onsubmit="return confirmDelete(event, this, 'Tahun akademik ini akan dihapus!');">
+                                                <button type="submit" class="bg-red-100 text-red-600 px-2 py-1 rounded-md text-[10px] font-bold hover:bg-red-200">Hapus</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr><td colspan="3" class="px-4 py-6 text-center text-gray-500 font-bold text-xs">Belum ada data.</td></tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- MODAL TAMBAH KELAS -->
+    <div id="modalTambahKelas" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl relative">
+            <button onclick="toggleModal('modalTambahKelas')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Tambah Kelas</h2>
+            <form action="/master-data/kelas" method="POST" class="space-y-4">
+                <input type="text" name="namaKelasAkhiran" placeholder="Jurusan & Urutan (Contoh: PPLG 1)" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <p class="text-xs text-gray-500 text-center">* Kelas tingkat X, XI, dan XII akan otomatis dibuat.</p>
+                <button type="submit" class="w-full bg-primary text-white font-bold rounded-xl py-3.5 mt-4 hover:bg-primary-dark">Simpan Kelas</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL TAMBAH ANGKATAN -->
+    <div id="modalTambahAngkatan" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl relative">
+            <button onclick="toggleModal('modalTambahAngkatan')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Tambah Angkatan</h2>
+            <form action="/master-data/angkatan" method="POST" class="space-y-4">
+                <input type="text" name="nomorAngkatan" placeholder="Angkatan (Contoh: 2023)" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <button type="submit" class="w-full bg-primary text-white font-bold rounded-xl py-3.5 mt-4 hover:bg-primary-dark">Simpan Angkatan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL TAMBAH TAHUN AKADEMIK -->
+    <div id="modalTambahTA" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl relative">
+            <button onclick="toggleModal('modalTambahTA')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Tambah Tahun Akademik</h2>
+            <form action="/master-data/tahun-akademik" method="POST" class="space-y-4">
+                <input type="text" name="tahunAjaran" placeholder="Tahun Ajaran (Contoh: 2023/2024)" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <div class="flex items-center gap-2 pl-2">
+                    <input type="checkbox" name="isActive" value="true" id="isActiveCheck" class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                    <label for="isActiveCheck" class="text-sm font-medium text-gray-700">Set sebagai Aktif</label>
+                </div>
+                <button type="submit" class="w-full bg-primary text-white font-bold rounded-xl py-3.5 mt-4 hover:bg-primary-dark">Simpan TA</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Cek pesan error dari URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const errorMsg = urlParams.get('error');
+        if (errorMsg) {
+            Swal.fire({
+                title: 'Error!',
+                text: decodeURIComponent(errorMsg).replace(/_/g, ' '),
+                icon: 'error',
+                confirmButtonColor: '#3085d6',
+                confirmButtonText: 'Tutup'
+            });
+            // Hapus query string error
+            window.history.replaceState(null, null, window.location.pathname);
+        }
+
+        function toggleModal(modalID) {
+            const modal = document.getElementById(modalID);
+            modal.classList.toggle('hidden');
+        }
+
+        function confirmDelete(e, form, text) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Hapus Data?', text: text, icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!'
+            }).then((result) => {
+                if (result.isConfirmed) form.submit();
+            });
+        }
+
+        function filterKelas() {
+            const input = document.getElementById('searchKelas').value.toUpperCase();
+            const rows = document.querySelectorAll('.kelas-row');
+            rows.forEach(row => {
+                const name = row.querySelector('.kelas-name').innerText.toUpperCase();
+                if (name.includes(input)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    </script>
+
+    
+
+    
+
+
+    </body>
+</html>
+
