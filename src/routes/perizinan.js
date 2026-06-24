@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const fs = require('fs').promises; // Gunakan 'fs' promise-based untuk async/await
 const path = require('path');
+const { sendPushNotification } = require('../utils/firebase'); // [BARU] Import util firebase
 
 const prisma = new PrismaClient();
 
@@ -85,6 +86,38 @@ router.post('/', upload.single('fileBukti'), async (req, res) => {
                 status: 'Pending'
             }
         });
+
+        // --- [BARU] PUSH NOTIFICATION KE GURU WALI KELAS ---
+        try {
+            const enrolment = await prisma.enrolmentSiswa.findFirst({
+                where: { siswaId: siswa.id, isActive: true },
+                include: {
+                    enrolmentKelas: {
+                        include: {
+                            enrolmentGuru: {
+                                where: { isActive: true },
+                                include: { guru: { include: { user: true } } }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (enrolment && enrolment.enrolmentKelas && enrolment.enrolmentKelas.enrolmentGuru.length > 0) {
+                const guruWali = enrolment.enrolmentKelas.enrolmentGuru[0].guru;
+                if (guruWali && guruWali.user && guruWali.user.fcmToken) {
+                    await sendPushNotification(
+                        guruWali.user.fcmToken,
+                        'Pengajuan Izin Baru',
+                        `${siswa.namaLengkap} mengajukan izin ${jenisIzin}.`,
+                        { type: 'izin', izinId: izinBaru.id.toString() }
+                    );
+                }
+            }
+        } catch (errFcm) {
+            console.error('Gagal mengirim FCM untuk pengajuan izin:', errFcm.message);
+        }
+        // ---------------------------------------------------
 
         res.status(201).json({ status: 'success', data: izinBaru, message: 'Izin berhasil diajukan' });
     } catch (err) {
@@ -179,6 +212,26 @@ router.put('/:id/status', async (req, res) => {
                 }
             }
         }
+
+        // --- [BARU] PUSH NOTIFICATION KE SISWA ---
+        try {
+            const izinData = await prisma.perizinan.findUnique({
+                where: { id: izinId },
+                include: { siswa: { include: { user: true } } }
+            });
+
+            if (izinData && izinData.siswa && izinData.siswa.user && izinData.siswa.user.fcmToken) {
+                await sendPushNotification(
+                    izinData.siswa.user.fcmToken,
+                    'Status Izin Diperbarui',
+                    `Pengajuan izin Anda telah ${statusUpdate}.`,
+                    { type: 'izin_status', izinId: izinId.toString() }
+                );
+            }
+        } catch (errFcm) {
+            console.error('Gagal mengirim FCM persetujuan izin:', errFcm.message);
+        }
+        // -----------------------------------------
 
         res.status(200).json({ status: 'success', message: `Izin berhasil di-${statusUpdate}` });
     } catch (err) {
