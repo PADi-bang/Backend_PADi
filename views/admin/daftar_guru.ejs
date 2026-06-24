@@ -131,7 +131,7 @@
                                     <% if (user.guru && user.guru.enrolmentGuru && user.guru.enrolmentGuru.length > 0) { %>
                                         <div class="flex flex-wrap gap-1">
                                             <% user.guru.enrolmentGuru.forEach(function(eg) { %>
-                                                <span class="bg-indigo-50 border border-indigo-100 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold"><%= eg.enrolmentKelas.masterKelas.namaKelas %></span>
+                                                <span class="bg-indigo-50 border border-indigo-100 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold"><%= eg.enrolmentKelas.masterKelas.tingkat ? eg.enrolmentKelas.masterKelas.tingkat.namaTingkat + ' ' + eg.enrolmentKelas.masterKelas.namaKelas : eg.enrolmentKelas.masterKelas.namaKelas %></span>
                                             <% }); %>
                                         </div>
                                     <% } else { %>

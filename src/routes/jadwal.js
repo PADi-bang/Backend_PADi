@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
         if (tipeJadwal === 'Reguler' || !tanggal) {
             currentHari = 'Senin, Selasa, Rabu, Kamis, Jumat';
         } else {
-            currentHari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
+            currentHari = req.body.opsiTanggal || 'multiple';
         }
 
         let processedTanggal = [];
@@ -120,7 +120,7 @@ router.put('/:id', async (req, res) => {
         if (tipeJadwal === 'Reguler' || !tanggal) {
             currentHari = 'Senin, Selasa, Rabu, Kamis, Jumat';
         } else {
-            currentHari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
+            currentHari = req.body.opsiTanggal || 'multiple';
         }
 
         let processedTanggal = [];

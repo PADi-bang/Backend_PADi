@@ -99,7 +99,18 @@
                         <div>
                             <h4 class="font-bold text-gray-800 capitalize"><%= jadwal.namaJadwal %></h4>
                             <p class="text-xs text-gray-500 mt-1 font-semibold">
-                                <% if(jadwal.tanggal && jadwal.tanggal.length > 0) { %>📅 <%= jadwal.tanggal.map(d => (typeof d === 'string' ? d : new Date(d).toISOString()).substring(0, 10)).join(', ') %> | <% } %>
+                                <% 
+                                    let tglText = '';
+                                    if(jadwal.tanggal && jadwal.tanggal.length > 0) { 
+                                        let tgls = jadwal.tanggal.map(d => (typeof d === 'string' ? d : new Date(d).toISOString()).substring(0, 10)).sort();
+                                        if(tgls.length > 3) {
+                                            tglText = tgls.length + ' Hari (' + tgls[0] + ' s.d. ' + tgls[tgls.length - 1] + ')';
+                                        } else {
+                                            tglText = tgls.join(', ');
+                                        }
+                                    }
+                                %>
+                                <% if(tglText) { %>📅 <%= tglText %> | <% } %>
                                 🕒 <%= formatTime(jadwal.jamMasukStart) %> - <%= formatTime(jadwal.jamPulang) %>
                             </p>
                         </div>
@@ -110,7 +121,7 @@
                         <% } else { %>
                             <button onclick="aktifkanJadwal('<%= jadwal.id %>')" class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-full text-xs font-bold border border-gray-200 transition shadow-sm" title="Aktifkan Jadwal">Aktifkan</button>
                         <% } %>
-                        <button onclick="editJadwal('<%= jadwal.id %>', '<%= jadwal.namaJadwal %>', '<%= jadwal.tanggal && jadwal.tanggal.length > 0 ? jadwal.tanggal.map(d => (typeof d === 'string' ? d : new Date(d).toISOString()).substring(0, 10)).join(',') : '' %>', '<%= jadwal.jamMasukStart ? (typeof jadwal.jamMasukStart === 'string' ? jadwal.jamMasukStart : new Date(jadwal.jamMasukStart).toISOString()).substring(11, 16) : '' %>', '<%= jadwal.jamMasukFinish ? (typeof jadwal.jamMasukFinish === 'string' ? jadwal.jamMasukFinish : new Date(jadwal.jamMasukFinish).toISOString()).substring(11, 16) : '' %>', '<%= jadwal.jamPulang ? (typeof jadwal.jamPulang === 'string' ? jadwal.jamPulang : new Date(jadwal.jamPulang).toISOString()).substring(11, 16) : '' %>')" class="text-primary-light hover:text-primary-dark ml-3" title="Edit">Edit</button>
+                        <button onclick="editJadwal('<%= jadwal.id %>', '<%= jadwal.namaJadwal %>', '<%= jadwal.tanggal && jadwal.tanggal.length > 0 ? jadwal.tanggal.map(d => (typeof d === 'string' ? d : new Date(d).toISOString()).substring(0, 10)).join(',') : '' %>', '<%= jadwal.jamMasukStart ? (typeof jadwal.jamMasukStart === 'string' ? jadwal.jamMasukStart : new Date(jadwal.jamMasukStart).toISOString()).substring(11, 16) : '' %>', '<%= jadwal.jamMasukFinish ? (typeof jadwal.jamMasukFinish === 'string' ? jadwal.jamMasukFinish : new Date(jadwal.jamMasukFinish).toISOString()).substring(11, 16) : '' %>', '<%= jadwal.jamPulang ? (typeof jadwal.jamPulang === 'string' ? jadwal.jamPulang : new Date(jadwal.jamPulang).toISOString()).substring(11, 16) : '' %>', '<%= jadwal.hari %>')" class="text-primary-light hover:text-primary-dark ml-3" title="Edit">Edit</button>
                         <button onclick="hapusJadwal('<%= jadwal.id %>')" class="text-red-500 hover:text-red-700 ml-3" title="Hapus">Hapus</button>
                     </div>
                 </div>
@@ -287,7 +298,7 @@
             dateFormat: "Y-m-d"
         });
 
-        function editJadwal(id, nama, tanggalListStr, masuk, batas, pulang) {
+        function editJadwal(id, nama, tanggalListStr, masuk, batas, pulang, opsiTanggalDb) {
             event.stopPropagation();
             document.getElementById('jadwalId').value = id;
             document.getElementById('inputNama').value = nama;
@@ -296,26 +307,15 @@
             let dates = [];
             if (tanggalListStr) {
                 dates = tanggalListStr.split(',').sort();
-                let isRange = false;
-                if (dates.length > 1) {
-                    isRange = true;
-                    for (let i = 1; i < dates.length; i++) {
-                        const prev = new Date(dates[i-1]);
-                        const curr = new Date(dates[i]);
-                        const diffDays = Math.round(Math.abs(curr - prev) / (1000 * 60 * 60 * 24)); 
-                        if (diffDays !== 1) {
-                            isRange = false;
-                            break;
-                        }
-                    }
-                }
                 document.querySelector('input[name="tipeJadwal"][value="Khusus"]').checked = true;
-                if (isRange) {
-                    document.querySelector('input[name="opsiTanggal"][value="range"]').checked = true;
+                
+                let opsiUI = (opsiTanggalDb === 'range' || opsiTanggalDb === 'multiple') ? opsiTanggalDb : 'multiple';
+                document.querySelector('input[name="opsiTanggal"][value="' + opsiUI + '"]').checked = true;
+                
+                if (opsiUI === 'range') {
                     fpRange.setDate([dates[0], dates[dates.length - 1]]);
                     fpMultiple.clear();
                 } else {
-                    document.querySelector('input[name="opsiTanggal"][value="multiple"]').checked = true;
                     fpMultiple.setDate(dates);
                     fpRange.clear();
                 }

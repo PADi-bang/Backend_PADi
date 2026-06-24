@@ -97,13 +97,20 @@ router.get('/daftar-siswa', async (req, res) => {
                 ]
             };
         }
+        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
         const siswas = await prisma.user.findMany({
             where: whereClause,
             include: {
                 siswa: {
                     include: {
                         masterAngkatan: true,
-                        enrolmentSiswa: { where: { isActive: true }, include: { enrolmentKelas: { include: { masterKelas: { include: { tingkat: true } } } } } }
+                        enrolmentSiswa: { 
+                            where: { 
+                                isActive: true,
+                                ...(activeTa ? { enrolmentKelas: { tahunAkademikId: activeTa.id } } : {})
+                            }, 
+                            include: { enrolmentKelas: { include: { masterKelas: { include: { tingkat: true } } } } } 
+                        }
                     }
                 }
             },
@@ -179,13 +186,25 @@ router.get('/daftar-guru', async (req, res) => {
         if (search) {
             whereClause = { ...whereClause, OR: [ { username: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }, { guru: { namaLengkap: { contains: search, mode: 'insensitive' } } }, { guru: { nip: { contains: search, mode: 'insensitive' } } } ] };
         }
+        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
         const gurus = await prisma.user.findMany({
             where: whereClause,
-            include: { guru: { include: { enrolmentGuru: { where: { isActive: true }, include: { enrolmentKelas: { include: { masterKelas: true } } } } } } },
+            include: { 
+                guru: { 
+                    include: { 
+                        enrolmentGuru: { 
+                            where: { 
+                                isActive: true,
+                                ...(activeTa ? { enrolmentKelas: { tahunAkademikId: activeTa.id } } : {})
+                            }, 
+                            include: { enrolmentKelas: { include: { masterKelas: { include: { tingkat: true } } } } } 
+                        } 
+                    } 
+                } 
+            },
             orderBy: { id: 'desc' }
         });
 
-        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
         let mappedEnrolments = [];
         if (activeTa) {
             const rawEnrolments = await prisma.enrolmentKelas.findMany({
