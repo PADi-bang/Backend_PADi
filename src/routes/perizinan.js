@@ -183,7 +183,7 @@ router.put('/:id/status', async (req, res) => {
                         where: {
                             sekolahId: izin.siswa.sekolahId,
                             hari: { contains: dayOfWeek },
-                            tanggal: null,
+                            tanggal: { isEmpty: true },
                             isLibur: false
                         }
                     });

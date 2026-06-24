@@ -19,7 +19,10 @@ router.post('/register', async (req, res) => {
     // Cek apakah username atau email sudah terdaftar menggunakan Prisma
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ username: username }, { email: email }],
+        OR: [
+          { username: { equals: username, mode: 'insensitive' } },
+          { email: { equals: email, mode: 'insensitive' } }
+        ],
       },
     });
 
@@ -85,8 +88,8 @@ router.post('/login', async (req, res) => {
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { username: loginIdentifier },
-          { email: loginIdentifier }
+          { username: { equals: loginIdentifier, mode: 'insensitive' } },
+          { email: { equals: loginIdentifier, mode: 'insensitive' } }
         ]
       },
       include: { role: true },
