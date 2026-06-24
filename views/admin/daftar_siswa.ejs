@@ -297,7 +297,7 @@
             const hasWarning = urlParams.get('warning');
 
             // EJS injects importErrors here
-            const importErrors = <%- importErrors ? JSON.stringify(importErrors) : 'null' %>;
+            const importErrors = <%- typeof importErrors !== 'undefined' && importErrors ? JSON.stringify(importErrors) : 'null' %>;
 
             if (successMsg) {
                 if (hasWarning && importErrors && importErrors.length > 0) {

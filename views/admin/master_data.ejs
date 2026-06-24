@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -256,7 +256,7 @@
             <button onclick="toggleModal('modalTambahAngkatan')" class="absolute top-6 right-6 text-gray-400 hover:text-black font-bold">✖</button>
             <h2 class="text-2xl font-bold text-gray-800 mb-6">Tambah Angkatan</h2>
             <form action="/master-data/angkatan" method="POST" class="space-y-4">
-                <input type="text" name="nomorAngkatan" placeholder="Angkatan (Contoh: 2023)" required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
+                <input type="number" name="nomorAngkatan" placeholder="Contoh: 1, 2, 3..." required class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary-light">
                 <button type="submit" class="w-full bg-primary text-white font-bold rounded-xl py-3.5 mt-4 hover:bg-primary-dark">Simpan Angkatan</button>
             </form>
         </div>

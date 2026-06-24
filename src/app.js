@@ -96,22 +96,89 @@ cron.schedule('0 0 1 * *', () => {
 
 cron.schedule('0 0 1 7 *', async () => {
     try {
-        console.log('[Cron] Menjalankan pengecekan angkatan baru...');
+        console.log('[Cron] Menjalankan pengecekan angkatan & TA baru...');
         const tahunSekarang = new Date().getFullYear();
-        
-        const existing = await prismaCron.masterAngkatan.findFirst({
-            where: { nomorAngkatan: tahunSekarang.toString() }
+        const tahunDepan = tahunSekarang + 1;
+        const newTaString = `${tahunSekarang}/${tahunDepan}`;
+
+        // 1. Cek & Buat Tahun Akademik Baru
+        const existingTa = await prismaCron.masterTahunAkademik.findFirst({
+            where: { tahunAjaran: newTaString }
+        });
+
+        if (!existingTa) {
+            const oldTa = await prismaCron.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: 1 } });
+            
+            await prismaCron.masterTahunAkademik.updateMany({ data: { isActive: false } });
+            
+            const newTa = await prismaCron.masterTahunAkademik.create({
+                data: { tahunAjaran: newTaString, semester: 'Ganjil', isActive: true, sekolahId: 1 }
+            });
+            console.log(`[Cron] Berhasil menambah Tahun Akademik baru: ${newTaString}`);
+
+            if (oldTa) {
+                const oldEnrolments = await prismaCron.enrolmentKelas.findMany({
+                    where: { tahunAkademikId: oldTa.id },
+                    include: {
+                        masterKelas: true,
+                        enrolmentSiswa: { where: { isActive: true } }
+                    }
+                });
+
+                for (const ek of oldEnrolments) {
+                    for (const es of ek.enrolmentSiswa) {
+                        if (es.statusKenaikan === 'Belum Diproses' || es.statusKenaikan === 'Lulus') continue;
+                        let targetKelasId = null;
+                        if (es.statusKenaikan === 'Tidak Naik / Cuti') {
+                            targetKelasId = ek.kelasId;
+                        } else if (es.statusKenaikan === 'Naik Kelas') {
+                            const nextKelas = await prismaCron.masterKelas.findFirst({
+                                where: { sekolahId: ek.masterKelas.sekolahId, tingkatId: ek.masterKelas.tingkatId + 1, namaKelas: ek.masterKelas.namaKelas }
+                            });
+                            if (nextKelas) targetKelasId = nextKelas.id;
+                        }
+                        if (targetKelasId) {
+                            let newEk = await prismaCron.enrolmentKelas.findFirst({ where: { kelasId: targetKelasId, tahunAkademikId: newTa.id } });
+                            if (!newEk) {
+                                newEk = await prismaCron.enrolmentKelas.create({ data: { sekolahId: ek.masterKelas.sekolahId, kelasId: targetKelasId, tahunAkademikId: newTa.id, keterangan: '' } });
+                            }
+                            const existingEs = await prismaCron.enrolmentSiswa.findFirst({ where: { enrolmentKelasId: newEk.id, siswaId: es.siswaId } });
+                            if (!existingEs) {
+                                await prismaCron.enrolmentSiswa.create({ data: { enrolmentKelasId: newEk.id, siswaId: es.siswaId, isActive: true, statusKenaikan: 'Belum Diproses' } });
+                            }
+                        }
+                    }
+                }
+                console.log(`[Cron] Berhasil memproses kenaikan kelas ke TA baru`);
+            }
+        }
+
+        // 2. Cek & Buat Angkatan Baru
+        const lastAngkatan = await prismaCron.masterAngkatan.findFirst({
+            where: { sekolahId: 1 },
+            orderBy: { id: 'desc' }
         });
         
-        if (!existing) {
+        let nextAngkatanNumber = 1;
+        if (lastAngkatan && lastAngkatan.nomorAngkatan.startsWith('Angkatan ke-')) {
+            const num = parseInt(lastAngkatan.nomorAngkatan.replace('Angkatan ke-', ''));
+            if (!isNaN(num)) nextAngkatanNumber = num + 1;
+        }
+
+        const newAngkatanString = `Angkatan ke-${nextAngkatanNumber}`;
+        const existingAngkatan = await prismaCron.masterAngkatan.findFirst({
+            where: { nomorAngkatan: newAngkatanString }
+        });
+
+        if (!existingAngkatan) {
             await prismaCron.masterAngkatan.create({
-                data: { nomorAngkatan: tahunSekarang.toString(), sekolahId: 1, isActive: true }
+                data: { nomorAngkatan: newAngkatanString, sekolahId: 1, isActive: true }
             });
-            console.log(`[Cron] Berhasil menambah angkatan baru: ${tahunSekarang}`);
+            console.log(`[Cron] Berhasil menambah angkatan baru: ${newAngkatanString}`);
             
             const activeAngkatans = await prismaCron.masterAngkatan.findMany({
-                where: { isActive: true },
-                orderBy: { nomorAngkatan: 'desc' }
+                where: { isActive: true, sekolahId: 1 },
+                orderBy: { id: 'desc' }
             });
             
             if (activeAngkatans.length > 4) {
@@ -124,8 +191,9 @@ cron.schedule('0 0 1 7 *', async () => {
                 }
             }
         }
+
     } catch (err) {
-        console.error('[Cron] Gagal update angkatan:', err.message);
+        console.error('[Cron] Gagal update TA/angkatan otomatis:', err.message);
     }
 });
 
