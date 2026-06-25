@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -206,9 +206,16 @@
 
     </main>
 
+    <script type="application/json" id="weekly-data">
+        <%- locals.stats ? JSON.stringify(locals.stats.attendanceWeekly) : '[0,0,0,0,0,0,0]' %>
+    </script>
+    <script type="application/json" id="status-data">
+        <%- locals.stats ? JSON.stringify(locals.stats.statusChart) : '[0,0,0]' %>
+    </script>
+
     <script>
-        const weeklyData = <%- locals.stats ? JSON.stringify(locals.stats.attendanceWeekly) : '[0,0,0,0,0,0,0]' %>;
-        const statusData = <%- locals.stats ? JSON.stringify(locals.stats.statusChart) : '[0,0,0]' %>;
+        const weeklyData = JSON.parse(document.getElementById('weekly-data').textContent);
+        const statusData = JSON.parse(document.getElementById('status-data').textContent);
 
         // 1. Konfigurasi Grafik Gelombang
         const attendanceOptions = {

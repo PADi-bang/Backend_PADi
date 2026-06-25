@@ -173,6 +173,37 @@ router.post('/daftar-siswa/delete/:id', async (req, res) => {
     }
 });
 
+// [BARU] DAFTAR WAJAH SISWA
+router.post('/daftar-siswa/set-wajah', async (req, res) => {
+    const { userId, faceEmbedding } = req.body;
+    try {
+        if (!userId || !faceEmbedding) {
+            return res.status(400).json({ status: 'error', message: 'User ID dan data wajah wajib diisi' });
+        }
+        
+        let faceModelString = typeof faceEmbedding === 'string' ? faceEmbedding : JSON.stringify(faceEmbedding);
+
+        const siswa = await prisma.siswa.findUnique({
+            where: { userId: parseInt(userId) }
+        });
+
+        if (!siswa) {
+            return res.status(404).json({ status: 'error', message: 'Siswa tidak ditemukan' });
+        }
+
+        await prisma.siswa.update({
+            where: { id: siswa.id },
+            data: { faceModel: faceModelString }
+        });
+
+        res.status(200).json({ status: 'success', message: 'Wajah berhasil didaftarkan' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ status: 'error', message: 'Terjadi kesalahan sistem saat menyimpan wajah' });
+    }
+});
+
+
 router.post('/daftar-siswa/upload', upload.single('file'), async (req, res) => {
     // (Akan menggunakan logika import excel yang sudah ada, redirect setelah selesai)
     res.redirect('/daftar-siswa?success=Fitur upload masih dalam perbaikan route');

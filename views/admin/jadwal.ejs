@@ -121,7 +121,15 @@
                         <% } else { %>
                             <button onclick="aktifkanJadwal('<%= jadwal.id %>')" class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-full text-xs font-bold border border-gray-200 transition shadow-sm" title="Aktifkan Jadwal">Aktifkan</button>
                         <% } %>
-                        <button onclick="editJadwal('<%= jadwal.id %>', '<%= jadwal.namaJadwal %>', '<%= jadwal.tanggal && jadwal.tanggal.length > 0 ? jadwal.tanggal.map(d => (typeof d === 'string' ? d : new Date(d).toISOString()).substring(0, 10)).join(',') : '' %>', '<%= jadwal.jamMasukStart ? (typeof jadwal.jamMasukStart === 'string' ? jadwal.jamMasukStart : new Date(jadwal.jamMasukStart).toISOString()).substring(11, 16) : '' %>', '<%= jadwal.jamMasukFinish ? (typeof jadwal.jamMasukFinish === 'string' ? jadwal.jamMasukFinish : new Date(jadwal.jamMasukFinish).toISOString()).substring(11, 16) : '' %>', '<%= jadwal.jamPulang ? (typeof jadwal.jamPulang === 'string' ? jadwal.jamPulang : new Date(jadwal.jamPulang).toISOString()).substring(11, 16) : '' %>', '<%= jadwal.hari %>')" class="text-primary-light hover:text-primary-dark ml-3" title="Edit">Edit</button>
+                        <button onclick="editJadwal(this)" 
+                                data-id="<%= jadwal.id %>"
+                                data-nama="<%= jadwal.namaJadwal %>"
+                                data-tanggal="<%= jadwal.tanggal && jadwal.tanggal.length > 0 ? jadwal.tanggal.map(d => (typeof d === 'string' ? d : new Date(d).toISOString()).substring(0, 10)).join(',') : '' %>"
+                                data-jam-masuk-start="<%= jadwal.jamMasukStart ? (typeof jadwal.jamMasukStart === 'string' ? jadwal.jamMasukStart : new Date(jadwal.jamMasukStart).toISOString()).substring(11, 16) : '' %>"
+                                data-jam-masuk-finish="<%= jadwal.jamMasukFinish ? (typeof jadwal.jamMasukFinish === 'string' ? jadwal.jamMasukFinish : new Date(jadwal.jamMasukFinish).toISOString()).substring(11, 16) : '' %>"
+                                data-jam-pulang="<%= jadwal.jamPulang ? (typeof jadwal.jamPulang === 'string' ? jadwal.jamPulang : new Date(jadwal.jamPulang).toISOString()).substring(11, 16) : '' %>"
+                                data-hari="<%= jadwal.hari %>"
+                                class="text-primary-light hover:text-primary-dark ml-3" title="Edit">Edit</button>
                         <button onclick="hapusJadwal('<%= jadwal.id %>')" class="text-red-500 hover:text-red-700 ml-3" title="Hapus">Hapus</button>
                     </div>
                 </div>
@@ -239,15 +247,19 @@
         </div>
     </main>
 
+    <script type="application/json" id="server-data">
+        <%- JSON.stringify({ 
+            jadwalList: typeof jadwalList !== 'undefined' ? jadwalList : [], 
+            kelasList: typeof kelasList !== 'undefined' ? kelasList : [] 
+        }) %>
+    </script>
+
     <script>
         const modal = document.getElementById('jadwalModal');
         const form = document.getElementById('formJadwal');
         const modalTitle = document.getElementById('modalTitle');
         
-        const dataServer = <%- JSON.stringify({ 
-            jadwalList: typeof jadwalList !== 'undefined' ? jadwalList : [], 
-            kelasList: typeof kelasList !== 'undefined' ? kelasList : [] 
-        }) %>;
+        const dataServer = JSON.parse(document.getElementById('server-data').textContent);
 
         function openModal() { 
             form.reset();
@@ -298,8 +310,16 @@
             dateFormat: "Y-m-d"
         });
 
-        function editJadwal(id, nama, tanggalListStr, masuk, batas, pulang, opsiTanggalDb) {
+        function editJadwal(button) {
             event.stopPropagation();
+            const id = button.getAttribute('data-id');
+            const nama = button.getAttribute('data-nama');
+            const tanggalListStr = button.getAttribute('data-tanggal');
+            const masuk = button.getAttribute('data-jam-masuk-start');
+            const batas = button.getAttribute('data-jam-masuk-finish');
+            const pulang = button.getAttribute('data-jam-pulang');
+            const opsiTanggalDb = button.getAttribute('data-hari');
+
             document.getElementById('jadwalId').value = id;
             document.getElementById('inputNama').value = nama;
             
