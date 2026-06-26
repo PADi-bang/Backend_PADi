@@ -174,30 +174,30 @@
                     <div class="mb-3">
                         <div class="flex justify-between text-xs font-bold text-gray-600 mb-1">
                             <span>Kelas X</span>
-                            <span>45%</span>
+                            <span><%= locals.stats && locals.stats.lateDistribution ? locals.stats.lateDistribution.X : 0 %>%</span>
                         </div>
                         <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div class="bg-primary h-full w-[45%]"></div>
+                            <div class="bg-primary h-full" style="width: <%= locals.stats && locals.stats.lateDistribution ? locals.stats.lateDistribution.X : 0 %>%"></div>
                         </div>
                     </div>
                     
                     <div class="mb-3">
                         <div class="flex justify-between text-xs font-bold text-gray-600 mb-1">
                             <span>Kelas XI</span>
-                            <span>30%</span>
+                            <span><%= locals.stats && locals.stats.lateDistribution ? locals.stats.lateDistribution.XI : 0 %>%</span>
                         </div>
                         <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div class="bg-black h-full w-[30%]"></div>
+                            <div class="bg-black h-full" style="width: <%= locals.stats && locals.stats.lateDistribution ? locals.stats.lateDistribution.XI : 0 %>%"></div>
                         </div>
                     </div>
                     
                     <div class="mb-1">
                         <div class="flex justify-between text-xs font-bold text-gray-600 mb-1">
                             <span>Kelas XII</span>
-                            <span>25%</span>
+                            <span><%= locals.stats && locals.stats.lateDistribution ? locals.stats.lateDistribution.XII : 0 %>%</span>
                         </div>
                         <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div class="bg-gray-400 h-full w-[25%]"></div>
+                            <div class="bg-gray-400 h-full" style="width: <%= locals.stats && locals.stats.lateDistribution ? locals.stats.lateDistribution.XII : 0 %>%"></div>
                         </div>
                     </div>
                 </div>
