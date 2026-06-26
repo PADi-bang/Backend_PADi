@@ -1,6 +1,9 @@
 # Dependencies
 node_modules
 
+# Uploaded files
+uploads/
+
 # Environment Variables
 # Keep environment variables out of version control
 .env

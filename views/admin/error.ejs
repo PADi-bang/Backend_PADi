@@ -1,0 +1,7 @@
+<h1><%= message || 'Terjadi Kesalahan' %></h1>
+<% if (typeof error !== 'undefined' && error) { %>
+<h2><%= error.status || '500' %></h2>
+<pre><%= error.stack %></pre>
+<% } else { %>
+<h2>500 Internal Server Error</h2>
+<% } %>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enrolment Kelas - App_PADi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="icon" type="image/png" href="/favicon.png">
+
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#006D5B',
+                        'primary-dark': '#004A3F',
+                        'primary-light': '#338A7B',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+</head>
+<body class="bg-slate-100 flex font-sans">
+    
+    <aside class="w-64 h-screen bg-[#00382E] text-white/70 p-6 flex flex-col fixed rounded-r-3xl shadow-2xl z-20">
+        <div class="flex items-center gap-3 mb-12 mt-4 pl-2">
+            <img src="/images/logo_padi.png" alt="Logo" class="w-10 h-10 object-contain drop-shadow-md">
+            <span class="text-3xl font-black text-white tracking-widest">PADi</span>
+        </div>
+        <nav class="flex-1 space-y-3">
+            <a href="/dashboard" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg> Dashboard
+            </a>
+            <a href="/daftar-siswa" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg> Daftar Siswa
+            </a>
+            <a href="/daftar-guru" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> Daftar Guru
+            </a>
+            <a href="/jadwal" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> Jadwal
+            </a>
+            <a href="/master-data" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg> Master Data
+            </a>
+            <a href="/enrolment" class="flex items-center gap-4 p-3.5 bg-primary text-white rounded-2xl shadow-lg shadow-primary/40 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg> Enrolment Kelas
+            </a>
+        </nav>
+        <div class="mt-auto mb-4">
+            <a href="/logout" class="flex justify-center items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3.5 px-4 rounded-full transition shadow-lg shadow-primary/30">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> LOGOUT
+            </a>
+        </div>
+    </aside>
+
+    <main class="flex-1 ml-64 p-8">
+        
+        <div class="bg-primary rounded-3xl p-4 flex justify-between items-center text-white mb-8 shadow-lg shadow-primary/20">
+            <h1 class="text-2xl font-bold ml-4">Enrolment Kelas</h1>
+
+            <div class="flex items-center gap-6 pr-4">
+                <div class="flex items-center gap-3 pl-6 cursor-pointer">
+                    <span class="text-sm font-bold tracking-wide uppercase">Admin PADI</span>
+                    <div class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-primary font-bold text-xs">AD</div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">🏫 Daftar Kelas</h2>
+            <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                <label for="filterTA" class="text-sm font-bold text-gray-600 whitespace-nowrap">Filter TA:</label>
+                <select id="filterTA" class="bg-slate-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-primary-light font-bold text-primary-dark" onchange="window.location.href='/enrolment?taId='+this.value">
+                    <% if (typeof masterData !== 'undefined' && masterData.ta) { %>
+                        <% masterData.ta.forEach(t => { %>
+                            <option value="<%= t.id %>" <%= typeof selectedTaId !== 'undefined' && selectedTaId == t.id ? 'selected' : '' %>>
+                                <%= t.tahunAjaran %> (<%= t.semester %>)<%= t.isActive ? ' - AKTIF' : '' %>
+                            </option>
+                        <% }) %>
+                    <% } %>
+                </select>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden p-6">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 text-[10px] text-gray-400 uppercase tracking-wider font-bold">
+                    <tr>
+                        <th class="px-6 py-4">Nama Kelas</th>
+                        <th class="px-6 py-4">Tahun Akademik</th>
+                        <th class="px-6 py-4">Siswa</th>
+                        <th class="px-6 py-4">Wali Kelas</th>
+                        <th class="px-6 py-4 text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y text-sm">
+                    <% if (typeof enrolmentData !== 'undefined' && enrolmentData.length > 0) { %>
+                        <% enrolmentData.forEach(function(row) { %>
+                            <tr class="hover:bg-slate-50 transition">
+                                <td class="px-6 py-4 font-bold text-primary"><%= row.masterKelas.namaKelas %></td>
+                                <% if (row.enrolment) { %>
+                                    <td class="px-6 py-4 text-gray-600">
+                                        <%= row.enrolment.masterTahunAkademik.tahunAjaran %> 
+                                        <span class="text-[10px] bg-slate-200 px-2 py-0.5 rounded-md ml-1"><%= row.enrolment.masterTahunAkademik.semester %></span>
+                                    </td>
+                                    <td class="px-6 py-4"><span class="bg-primary/20 text-primary-dark font-bold px-3 py-1 rounded-full text-xs"><%= row.enrolment._count.enrolmentSiswa %> Siswa</span></td>
+                                    <td class="px-6 py-4">
+                                        <% if (row.enrolment.enrolmentGuru && row.enrolment.enrolmentGuru.length > 0) { %>
+                                            <span class="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-xs"><%= row.enrolment.enrolmentGuru[0].guru.namaLengkap %></span>
+                                        <% } else { %>
+                                            <span class="bg-yellow-100 text-yellow-700 font-bold px-3 py-1 rounded-full text-xs">Belum Diatur</span>
+                                        <% } %>
+                                    </td>
+                                <% } else { %>
+                                    <td class="px-6 py-4 text-gray-400 italic">Belum diset</td>
+                                    <td class="px-6 py-4"><span class="bg-gray-100 text-gray-500 font-bold px-3 py-1 rounded-full text-xs">0 Siswa</span></td>
+                                    <td class="px-6 py-4"><span class="bg-gray-100 text-gray-500 font-bold px-3 py-1 rounded-full text-xs">Belum Diatur</span></td>
+                                <% } %>
+                                <td class="px-6 py-4 flex justify-center gap-2">
+                                    <% if (row.enrolment) { %>
+                                        <a href="/enrolment/<%= row.enrolment.id %>" class="bg-primary/20 text-primary px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-primary/30 transition">Detail Siswa & Guru</a>
+                                    <% } else { %>
+                                        <form action="/enrolment/activate-kelas" method="POST" class="inline">
+                                            <input type="hidden" name="kelasId" value="<%= row.masterKelas.id %>">
+                                            <input type="hidden" name="sekolahId" value="1">
+                                            <button type="submit" class="bg-yellow-100 text-yellow-600 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-yellow-200 transition">Buka Kelas</button>
+                                        </form>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    <% } else { %>
+                        <tr><td colspan="6" class="px-8 py-8 text-center text-gray-500 font-bold">Belum ada master kelas yang dibuat.</td></tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+
+    <script>
+        // Tampilkan error dari URL (Validasi Unik)
+        const urlParams = new URLSearchParams(window.location.search);
+        const errorMsg = urlParams.get('error');
+        if (errorMsg) {
+            Swal.fire({
+                title: 'Tidak Diizinkan!',
+                text: decodeURIComponent(errorMsg).replace(/_/g, ' '),
+                icon: 'error',
+                confirmButtonColor: '#3085d6',
+                confirmButtonText: 'Tutup'
+            });
+            window.history.replaceState(null, null, window.location.pathname);
+        }
+
+        function toggleModal(modalID) {
+            const modal = document.getElementById(modalID);
+            modal.classList.toggle('hidden');
+        }
+    </script>
+
+</body>
+</html>

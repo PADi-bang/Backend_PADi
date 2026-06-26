@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Login - App_PADi</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<link rel="icon" type="image/png" href="/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#006D5B',
+                        'primary-dark': '#004A3F',
+                        'primary-light': '#338A7B',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-slate-50 font-sans overflow-hidden">
+
+    <div class="flex h-screen w-full relative">
+
+       
+
+        <div class="hidden lg:flex w-5/12 flex-col justify-center px-16 xl:px-24 z-10 relative">
+
+            <div class="flex items-center gap-4 mb-16">
+
+                <img src="/images/logo_padi.png" alt="PADi Logo" class="w-16 h-16 drop-shadow-xl">
+
+                <span class="text-4xl font-black tracking-widest text-primary">PADi</span>
+
+            </div>
+
+           
+
+            <h1 class="text-6xl font-black text-primary mb-6 tracking-tight leading-[1.1]">WELCOME<br>BACK!</h1>
+
+            <p class="text-xl text-slate-500 font-medium max-w-md leading-relaxed">Masuk ke akun Admin Anda untuk mengelola portal absensi secara real-time.</p>
+
+        </div>
+
+
+
+        <div class="w-full lg:w-7/12 bg-gradient-to-br from-primary to-primary-dark flex flex-col justify-center items-center text-white z-20 relative lg:[clip-path:polygon(15%_0%,100%_0%,100%_100%,0%_100%)] shadow-2xl">
+
+           
+
+            <div class="lg:hidden flex items-center gap-3 mb-10">
+
+                <img src="/images/logo_padi.png" alt="PADi Logo" class="w-10 h-10 drop-shadow-md">
+
+                <span class="text-3xl font-black tracking-widest text-white">PADi</span>
+
+            </div>
+
+
+
+            <div class="w-full max-w-md px-8 lg:px-0 lg:ml-20">
+
+                <h2 class="text-4xl font-bold mb-2">SIGN IN</h2>
+
+                <p class="text-primary-light text-xs tracking-[0.25em] mb-8 font-bold">TO ACCESS THE PORTAL</p>
+
+               
+
+                <div class="bg-white/10 backdrop-blur-md border border-white/20 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl">
+
+                    <form id="loginForm" action="/login" method="POST" class="space-y-6">
+
+                       
+
+                        <div>
+
+                            <div class="flex items-center bg-white rounded-full px-5 py-2 focus-within:ring-4 focus-within:ring-primary-light/50 transition-all shadow-inner">
+
+                                <svg class="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+
+                                <input type="text" id="email" name="email" placeholder="Email / Username" class="w-full bg-transparent text-gray-800 px-4 py-2.5 outline-none text-sm font-bold placeholder-gray-400" required>
+
+                            </div>
+
+                        </div>
+
+                       
+
+                        <div>
+
+                            <div class="flex items-center bg-white rounded-full px-5 py-2 focus-within:ring-4 focus-within:ring-primary-light/50 transition-all shadow-inner">
+
+                                <svg class="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+
+                                <input type="password" id="password" name="password" placeholder="Password" class="w-full bg-transparent text-gray-800 px-4 py-2.5 outline-none text-sm font-bold placeholder-gray-400" required>
+
+                            </div>
+
+                            <div class="flex justify-between items-center mt-4 px-2">
+
+                                <label class="flex items-center cursor-pointer group">
+
+                                    <input type="checkbox" class="rounded text-black focus:ring-black border-transparent w-4 h-4 cursor-pointer accent-black">
+
+                                    <span class="ml-2 text-xs text-primary/20 group-hover:text-white transition font-medium">Tetap masuk</span>
+
+                                </label>
+
+                                <a href="#" class="text-xs text-white/70 hover:text-white transition font-semibold hover:underline">Lupa Password?</a>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <button type="submit" class="w-full bg-black text-white font-bold py-4 rounded-full hover:bg-gray-800 hover:scale-[1.02] transition-all shadow-xl shadow-black/30 mt-2 flex justify-center items-center gap-2">
+
+                            MASUK
+
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+
+                            </svg>
+
+                        </button>
+
+                    </form>
+
+                </div>
+
+
+
+                <p class="text-center text-xs text-primary-light/60 mt-8 font-medium">© 2026 PADi Digital Solution. All rights reserved.</p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <script>
+        // Tampilkan error dari URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const errorMsg = urlParams.get('error');
+        if (errorMsg) {
+            Swal.fire({
+                title: 'Gagal Masuk',
+                text: decodeURIComponent(errorMsg).replace(/_/g, ' '),
+                icon: 'error',
+                confirmButtonColor: '#000000',
+                confirmButtonText: 'Tutup'
+            });
+            window.history.replaceState(null, null, window.location.pathname);
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+
+            e.preventDefault();
+
+            const emailInput = document.getElementById('email').value;
+
+            const passwordInput = document.getElementById('password').value;
+
+
+
+            try {
+
+                // Tembak API
+
+                const response = await fetch('/login', {
+
+                    method: 'POST',
+
+                    headers: { 'Content-Type': 'application/json' },
+
+                    body: JSON.stringify({ email: emailInput, password: passwordInput })
+
+                });
+
+
+
+                const result = await response.json();
+
+
+
+                if (response.ok && result.status === 'success') {
+
+                    if (result.data.role !== 'Admin') {
+
+                        Swal.fire({ icon: 'error', title: 'Akses Ditolak', text: 'Halaman ini khusus untuk Admin.', confirmButtonColor: '#000000' });
+
+                        return;
+
+                    }
+
+                    localStorage.setItem('adminToken', result.token);
+
+                    window.location.href = '/dashboard';
+
+                } else {
+
+                    Swal.fire({ icon: 'error', title: 'Gagal Masuk', text: result.message || 'Kombinasi email dan sandi salah.', confirmButtonColor: '#000000' });
+
+                }
+
+            } catch (error) {
+
+                // Fallback jika API terhubung via action bawaan EJS Session
+
+                e.target.submit();
+
+            }
+
+        });
+
+    </script>
+
+</body>
+
+</html>

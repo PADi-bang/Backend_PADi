@@ -4,11 +4,12 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const prisma = require('../db');
 const bcrypt = require('bcryptjs');
+const verifyToken = require('../middleware/auth');
 
 // POST /api/auth/register
 // Sesuai dengan skema baru di database.md
 router.post('/register', async (req, res) => {
-  const { username, email, password, roleName } = req.body; // roleName: 'Siswa', 'Guru', atau 'Admin'
+  const { username, email, password, roleName } = req.body || {}; // roleName: 'Siswa', 'Guru', atau 'Admin'
 
   if (!username || !email || !password || !roleName) {
     return res.status(400).json({ message: 'Username, email, password, dan roleName wajib diisi' });
@@ -18,7 +19,10 @@ router.post('/register', async (req, res) => {
     // Cek apakah username atau email sudah terdaftar menggunakan Prisma
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ username: username }, { email: email }],
+        OR: [
+          { username: { equals: username, mode: 'insensitive' } },
+          { email: { equals: email, mode: 'insensitive' } }
+        ],
       },
     });
 
@@ -72,7 +76,7 @@ router.post('/register', async (req, res) => {
 // Sesuai dengan skema baru di database.md dan terhubung dengan Flutter
 router.post('/login', async (req, res) => {
   // 1. Terima 'email' dari Flutter, atau 'username' (opsional)
-  const { username, email, password } = req.body;
+  const { username, email, password } = req.body || {};
   const loginIdentifier = email || username;
 
   if (!loginIdentifier || !password) {
@@ -84,8 +88,8 @@ router.post('/login', async (req, res) => {
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { username: loginIdentifier },
-          { email: loginIdentifier }
+          { username: { equals: loginIdentifier, mode: 'insensitive' } },
+          { email: { equals: loginIdentifier, mode: 'insensitive' } }
         ]
       },
       include: { role: true },
@@ -148,7 +152,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role.namaRole },
       process.env.JWT_SECRET, // Pastikan ada JWT_SECRET di file .env Anda!
-      { expiresIn: '8h' }
+      { expiresIn: '30d' }
     );
 
     // 6. Kembalikan respons yang sudah diperkaya dengan data geofence
@@ -165,7 +169,7 @@ router.post('/login', async (req, res) => {
 });
 // GET /api/auth/users
 // Mengambil semua data pengguna beserta rolenya (Cocok untuk halaman Daftar Siswa/Guru)
-router.get('/users', async (req, res) => {
+router.get('/users', verifyToken, async (req, res) => {
   try {
     // Gunakan findMany() untuk mengambil BANYAK data (bukan cuma satu)
     const allUsers = await prisma.user.findMany({
