@@ -180,12 +180,13 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin/master', require('./routes/master'));
 app.use('/api/admin/enrolment', require('./routes/enrolment'));
 
+app.use('/api/perizinan', require('./routes/perizinan'));
+app.use('/api/notifikasi', require('./routes/notifikasi')); // Tambahkan rute notifikasi yang hilang
+
 // --- [BARU] MOUNT RUTE BROWSER WEB ADMIN (MENAMPILKAN INTERFACE EJS) ---
 // Pengguna browser laptop mengakses halaman admin lewat rute utama ini
 const webAdminRoutes = require('./routes/webAdmin');
-app.use(webAdminRoutes); 
-
-app.use('/api/perizinan', require('./routes/perizinan'));
+app.use(webAdminRoutes);
 
 // --- PUBLIC PATH Diletakkan di sini ---
 // Agar aset statis (termasuk index.html Flutter jika ada) tidak memblokir rute web admin seperti / dan /login

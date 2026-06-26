@@ -178,12 +178,12 @@ router.put('/:id/status', async (req, res) => {
                     const current = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
                     const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][current.getUTCDay()];
                     
-                    // Cari jadwal reguler untuk hari tersebut
+                    // Cari jadwal reguler yang AKTIF untuk hari tersebut
                     let jadwal = await prisma.jadwalAbsensi.findFirst({
                         where: {
                             sekolahId: izin.siswa.sekolahId,
                             hari: { contains: dayOfWeek },
-                            tanggal: { isEmpty: true },
+                            isActive: true,
                             isLibur: false
                         }
                     });
