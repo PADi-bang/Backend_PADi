@@ -82,7 +82,7 @@ router.post('/', async (req, res) => {
 
         const newJadwal = await prisma.jadwalAbsensi.create({
             data: {
-                sekolahId: 1, // Default sementara
+                sekolahId: req.session.sekolahId, // Default sementara
                 namaJadwal,
                 hari: currentHari,
                 tanggal: processedTanggal,

@@ -10,24 +10,7 @@ const prisma = new PrismaClient();
 const upload = multer({ dest: os.tmpdir() });
 
 // --- MIDDLEWARE AUTH ---
-const checkAdminAuth = (req, res, next) => {
-    // Izinkan akses ke aset statis publik sebelum login
-    if (
-        req.path.startsWith('/images/') || 
-        req.path.startsWith('/stylesheets/') || 
-        req.path.startsWith('/icons/') || 
-        req.path.startsWith('/models/') || 
-        req.path === '/favicon.png' || 
-        req.path === '/manifest.json'
-    ) {
-        return next();
-    }
-
-    if (req.session && req.session.adminId) {
-        return next();
-    }
-    res.redirect('/login');
-};
+const checkAdminAuth = require('../middleware/sessionAuth');
 
 // --- AUTH ROUTES ---
 router.get('/login', (req, res) => {
@@ -56,6 +39,7 @@ router.post('/login', async (req, res) => {
         
         req.session.adminId = user.id;
         req.session.adminName = user.admin ? user.admin.namaAdmin : user.username;
+        req.session.sekolahId = user.admin ? user.admin.sekolahId : null;
         res.redirect('/dashboard');
     } catch (err) {
         console.error(err);
@@ -82,9 +66,9 @@ router.use((req, res, next) => {
 // 1. DASHBOARD
 router.get('/dashboard', async (req, res) => {
     try {
-        const totalSiswa = await prisma.siswa.count();
-        const totalGuru = await prisma.guru.count();
-        const totalAdmin = await prisma.admin.count();
+        const totalSiswa = await prisma.siswa.count({ where: { sekolahId: req.session.sekolahId } });
+        const totalGuru = await prisma.guru.count({ where: { sekolahId: req.session.sekolahId } });
+        const totalAdmin = await prisma.admin.count({ where: { sekolahId: req.session.sekolahId } });
         res.render('admin/dashboard', { 
             stats: { totalSiswa, totalGuru, totalAdmin, attendanceWeekly: [0,0,0,0,0,0,0], statusChart: [0,0,0] }
         });
@@ -97,7 +81,7 @@ router.get('/dashboard', async (req, res) => {
 router.get('/daftar-siswa', async (req, res) => {
     const { search } = req.query;
     try {
-        let whereClause = { roleId: 3 }; 
+        let whereClause = { roleId: 3, siswa: { sekolahId: req.session.sekolahId } }; 
         if (search) {
             whereClause = {
                 ...whereClause,
@@ -109,7 +93,7 @@ router.get('/daftar-siswa', async (req, res) => {
                 ]
             };
         }
-        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
+        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: req.session.sekolahId } });
         const siswas = await prisma.user.findMany({
             where: whereClause,
             include: {
@@ -128,7 +112,7 @@ router.get('/daftar-siswa', async (req, res) => {
             },
             orderBy: { id: 'desc' }
         });
-        const masterAngkatan = await prisma.masterAngkatan.findMany({ where: { isActive: true } });
+        const masterAngkatan = await prisma.masterAngkatan.findMany({ where: { isActive: true, sekolahId: req.session.sekolahId } });
         res.render('admin/daftar_siswa', { title: 'Daftar Siswa', siswas, masterAngkatan, search: search || '' });
     } catch (err) {
         res.render('admin/error', { message: err.message });
@@ -142,7 +126,7 @@ router.post('/daftar-siswa', async (req, res) => {
         await prisma.user.create({
             data: {
                 username, email, password: hashedPassword, roleId: 3,
-                siswa: { create: { namaLengkap, nis, sekolahId: 1, angkatanId: parseInt(angkatanId) || null } }
+                siswa: { create: { namaLengkap, nis, sekolahId: req.session.sekolahId, angkatanId: parseInt(angkatanId) || null } }
             }
         });
         res.redirect('/daftar-siswa?success=Siswa berhasil ditambahkan');
@@ -225,11 +209,11 @@ router.post('/daftar-siswa/upload', upload.single('file'), async (req, res) => {
 router.get('/daftar-guru', async (req, res) => {
     const { search } = req.query;
     try {
-        let whereClause = { roleId: 2 }; 
+        let whereClause = { roleId: 2, guru: { sekolahId: req.session.sekolahId } }; 
         if (search) {
             whereClause = { ...whereClause, OR: [ { username: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }, { guru: { namaLengkap: { contains: search, mode: 'insensitive' } } }, { guru: { nip: { contains: search, mode: 'insensitive' } } } ] };
         }
-        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
+        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: req.session.sekolahId } });
         const gurus = await prisma.user.findMany({
             where: whereClause,
             include: { 
@@ -305,7 +289,7 @@ router.post('/daftar-guru/:id/kelas', async (req, res) => {
         const guru = await prisma.guru.findUnique({ where: { userId } });
         if (!guru) return res.redirect('/daftar-guru?error=Guru tidak ditemukan');
 
-        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
+        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: req.session.sekolahId } });
         if (!activeTa) return res.redirect('/daftar-guru?error=Tidak ada TA aktif');
 
         const activeEnrolmentKelas = await prisma.enrolmentKelas.findMany({ where: { tahunAkademikId: activeTa.id } });
@@ -357,9 +341,9 @@ router.post('/daftar-guru/delete/:id', async (req, res) => {
 router.get('/master-data', async (req, res) => {
     try {
         const pengaturan = await prisma.pengaturan.findMany();
-        const kelasRaw = await prisma.masterKelas.findMany({ include: { tingkat: true } });
-        const angkatan = await prisma.masterAngkatan.findMany({ orderBy: { nomorAngkatan: 'asc' } });
-        const tahunAkademik = await prisma.masterTahunAkademik.findMany({ orderBy: { tahunAjaran: 'asc' } });
+        const kelasRaw = await prisma.masterKelas.findMany({ where: { sekolahId: req.session.sekolahId }, include: { tingkat: true } });
+        const angkatan = await prisma.masterAngkatan.findMany({ where: { sekolahId: req.session.sekolahId }, orderBy: { nomorAngkatan: 'asc' } });
+        const tahunAkademik = await prisma.masterTahunAkademik.findMany({ where: { sekolahId: req.session.sekolahId }, orderBy: { tahunAjaran: 'asc' } });
         
         let settingMap = {};
         pengaturan.forEach(p => settingMap[p.kunci] = p.nilai);
@@ -440,12 +424,12 @@ router.post('/master-data/kelas', async (req, res) => {
         const suffix = namaKelasAkhiran.trim().toUpperCase();
         const tingkats = await prisma.masterTingkat.findMany({ orderBy: { id: 'asc' } });
         const existing = await prisma.masterKelas.findFirst({
-            where: { namaKelas: { equals: suffix, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
+            where: { namaKelas: { equals: suffix, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) return res.redirect('/master-data?error=Nama kelas sudah ada');
         for (const t of tingkats) {
             await prisma.masterKelas.create({
-                data: { namaKelas: suffix, tingkatId: t.id, sekolahId: parseInt(sekolahId) || 1 }
+                data: { namaKelas: suffix, tingkatId: t.id, sekolahId: req.session.sekolahId }
             });
         }
         res.redirect('/master-data?success=Kelas berhasil ditambahkan');
@@ -473,12 +457,12 @@ router.post('/master-data/angkatan', async (req, res) => {
     try {
         const formattedAngkatan = `Angkatan ke-${nomorAngkatan}`;
         const existing = await prisma.masterAngkatan.findFirst({
-            where: { nomorAngkatan: { equals: formattedAngkatan, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
+            where: { nomorAngkatan: { equals: formattedAngkatan, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) return res.redirect('/master-data?error=Angkatan sudah ada');
-        const activeCount = await prisma.masterAngkatan.count({ where: { isActive: true, sekolahId: parseInt(sekolahId) || 1 } });
+        const activeCount = await prisma.masterAngkatan.count({ where: { isActive: true, sekolahId: req.session.sekolahId } });
         await prisma.masterAngkatan.create({
-            data: { nomorAngkatan: formattedAngkatan, sekolahId: parseInt(sekolahId) || 1, isActive: activeCount < 4 }
+            data: { nomorAngkatan: formattedAngkatan, sekolahId: req.session.sekolahId, isActive: activeCount < 4 }
         });
         res.redirect('/master-data?success=Angkatan berhasil ditambahkan');
     } catch (err) { res.redirect('/master-data?error=Gagal menambah angkatan'); }
@@ -496,16 +480,16 @@ router.post('/master-data/tahun-akademik', async (req, res) => {
     const { tahunAjaran, isActive, sekolahId } = req.body;
     try {
         const existing = await prisma.masterTahunAkademik.findFirst({
-            where: { tahunAjaran: { equals: tahunAjaran, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
+            where: { tahunAjaran: { equals: tahunAjaran, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) return res.redirect('/master-data?error=Tahun akademik sudah ada');
         const semesterAktif = await getSemesterAktif();
         let newIsActive = isActive === 'true' || isActive === true;
         if (newIsActive) {
-            await prisma.masterTahunAkademik.updateMany({ where: { sekolahId: parseInt(sekolahId) || 1 }, data: { isActive: false } });
+            await prisma.masterTahunAkademik.updateMany({ where: { sekolahId: req.session.sekolahId }, data: { isActive: false } });
         }
         await prisma.masterTahunAkademik.create({
-            data: { tahunAjaran, semester: semesterAktif, isActive: newIsActive, sekolahId: parseInt(sekolahId) || 1 }
+            data: { tahunAjaran, semester: semesterAktif, isActive: newIsActive, sekolahId: req.session.sekolahId }
         });
         res.redirect('/master-data?success=Tahun akademik berhasil ditambahkan');
     } catch (err) { res.redirect('/master-data?error=Gagal menambah tahun akademik'); }
@@ -596,7 +580,7 @@ router.get('/enrolment', async (req, res) => {
         const taId = req.query.taId ? parseInt(req.query.taId) : null;
         let activeTa = null;
         if (taId) activeTa = await prisma.masterTahunAkademik.findUnique({ where: { id: taId } });
-        if (!activeTa) activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true } });
+        if (!activeTa) activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: req.session.sekolahId } });
 
         const masterKelasList = await prisma.masterKelas.findMany({
             include: { tingkat: true },
@@ -605,7 +589,7 @@ router.get('/enrolment', async (req, res) => {
         
         const enrolments = await prisma.enrolmentKelas.findMany({
             where: {
-                sekolahId: 1,
+                sekolahId: req.session.sekolahId,
                 tahunAkademikId: activeTa ? activeTa.id : undefined
             },
             include: {
@@ -634,7 +618,7 @@ router.get('/enrolment', async (req, res) => {
             }
         });
 
-        const taList = await prisma.masterTahunAkademik.findMany({ orderBy: { tahunAjaran: 'asc' } });
+        const taList = await prisma.masterTahunAkademik.findMany({ where: { sekolahId: req.session.sekolahId }, orderBy: { tahunAjaran: 'asc' } });
         const masterData = { ta: taList };
 
         res.render('admin/enrolment', { enrolmentData: data, masterData, selectedTaId: activeTa ? activeTa.id : null });
@@ -685,12 +669,12 @@ router.get('/enrolment/:id', async (req, res) => {
 router.post('/enrolment/activate-kelas', async (req, res) => {
     const { kelasId, sekolahId } = req.body;
     try {
-        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: parseInt(sekolahId) || 1 } });
+        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: req.session.sekolahId } });
         if (!activeTa) return res.redirect('/enrolment?error=Tidak ada Tahun Akademik aktif');
         const existingEnrolment = await prisma.enrolmentKelas.findFirst({ where: { kelasId: parseInt(kelasId), tahunAkademikId: activeTa.id } });
         if (!existingEnrolment) {
             await prisma.enrolmentKelas.create({
-                data: { sekolahId: parseInt(sekolahId) || 1, kelasId: parseInt(kelasId), tahunAkademikId: activeTa.id, keterangan: '' }
+                data: { sekolahId: req.session.sekolahId, kelasId: parseInt(kelasId), tahunAkademikId: activeTa.id, keterangan: '' }
             });
         }
         res.redirect('/enrolment?success=Kelas berhasil diaktifkan');

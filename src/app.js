@@ -181,17 +181,23 @@ app.use('/api/jadwal', jadwalRoutes);
 
 // TAMBAHAN RUTE ADMIN UNTUK FITUR CRUD & SEARCH
 const adminRoutes = require('./routes/admin');
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin/master', require('./routes/master'));
-app.use('/api/admin/enrolment', require('./routes/enrolment'));
+const checkAdminAuth = require('./middleware/sessionAuth');
+app.use('/api/admin', checkAdminAuth, adminRoutes);
+app.use('/api/admin/master', checkAdminAuth, require('./routes/master'));
+app.use('/api/admin/enrolment', checkAdminAuth, require('./routes/enrolment'));
 
 app.use('/api/perizinan', require('./routes/perizinan'));
 app.use('/api/notifikasi', require('./routes/notifikasi')); // Tambahkan rute notifikasi yang hilang
+
+// --- [BARU] MOUNT RUTE DEVELOPER ADMIN ---
+const devAdminRoutes = require('./routes/devAdmin');
+app.use('/devadmin', devAdminRoutes);
 
 // --- [BARU] MOUNT RUTE BROWSER WEB ADMIN (MENAMPILKAN INTERFACE EJS) ---
 // Pengguna browser laptop mengakses halaman admin lewat rute utama ini
 const webAdminRoutes = require('./routes/webAdmin');
 app.use(webAdminRoutes);
+
 
 // --- PUBLIC PATH Diletakkan di sini ---
 // Agar aset statis (termasuk index.html Flutter jika ada) tidak memblokir rute web admin seperti / dan /login

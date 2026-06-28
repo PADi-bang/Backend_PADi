@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
         
         const enrolments = await prisma.enrolmentKelas.findMany({
             where: {
-                sekolahId: 1,
+                sekolahId: req.session.sekolahId,
                 tahunAkademikId: activeTa ? activeTa.id : undefined
             },
             include: {
@@ -108,7 +108,7 @@ router.post('/activate-kelas', async (req, res) => {
     try {
         // Cari Tahun Akademik yang sedang aktif
         const activeTa = await prisma.masterTahunAkademik.findFirst({
-            where: { isActive: true, sekolahId: parseInt(sekolahId) || 1 }
+            where: { isActive: true, sekolahId: req.session.sekolahId }
         });
 
         if (!activeTa) {
@@ -127,7 +127,7 @@ router.post('/activate-kelas', async (req, res) => {
         if (!existingEnrolment) {
             await prisma.enrolmentKelas.create({
                 data: {
-                    sekolahId: parseInt(sekolahId) || 1,
+                    sekolahId: req.session.sekolahId,
                     kelasId: parseInt(kelasId),
                     tahunAkademikId: tahunAkademikId,
                     keterangan: ''
