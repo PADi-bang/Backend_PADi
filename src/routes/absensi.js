@@ -80,7 +80,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     const storedEmbedding = JSON.parse(siswa.faceModel);
     const faceEmbedding = JSON.parse(faceEmbeddingJson); // [DIUBAH] Parse JSON string dari form-data
     const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
-    const FACE_RECOGNITION_THRESHOLD = 0.8; // Mode ketat (Strict) sesuai permintaan
+    const FACE_RECOGNITION_THRESHOLD = 1.4; // Mode ketat (Strict) sesuai permintaan
 
     if (distance > FACE_RECOGNITION_THRESHOLD) {
       // [PENTING] Hapus file sampah karena absensi dibatalkan
@@ -92,7 +92,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
       const locationCheckResult = await prisma.$queryRaw`
           SELECT ST_Covers(
               area_sekolah, 
-              ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
+              ST_SetSRID(ST_MakePoint(${parseFloat(longitude)}, ${parseFloat(latitude)}), 4326)::geography
           ) as "isWithinArea"
           FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
       `;
@@ -230,7 +230,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
 
     const result = await prisma.$queryRaw(Prisma.sql`
       INSERT INTO absensi (id_siswa, id_jadwal, tanggal, jam_masuk, status, keterangan, koordinat_masuk, foto_masuk)
-      VALUES (${siswa.id}, ${jadwal.id}, ${tanggalWIBString}::date, ${waktuWIBString}::time, ${status}::"AbsensiStatus", ${keterangan}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326), ${fotoMasukPath})
+      VALUES (${siswa.id}, ${jadwal.id}, ${tanggalWIBString}::date, ${waktuWIBString}::time, ${status}::"AbsensiStatus", ${keterangan}, ST_SetSRID(ST_MakePoint(${parseFloat(longitude)}, ${parseFloat(latitude)}), 4326), ${fotoMasukPath})
       RETURNING
         id_absensi, id_siswa, id_jadwal, tanggal, jam_masuk, jam_pulang, status, keterangan, foto_masuk, foto_pulang,
         ST_AsGeoJSON(koordinat_masuk) as koordinat_masuk;
@@ -295,7 +295,7 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
       const locationCheckResult = await prisma.$queryRaw`
           SELECT ST_Covers(
               area_sekolah, 
-              ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
+              ST_SetSRID(ST_MakePoint(${parseFloat(longitude)}, ${parseFloat(latitude)}), 4326)::geography
           ) as "isWithinArea"
           FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
       `;
@@ -399,7 +399,7 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
       SET 
         jam_pulang = ${waktuWIBString}::time,
         foto_pulang = ${fotoPulangPath},
-        koordinat_pulang = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
+        koordinat_pulang = ST_SetSRID(ST_MakePoint(${parseFloat(longitude)}, ${parseFloat(latitude)}), 4326)
       WHERE id_absensi = ${absensiHariIni.id}
       RETURNING
         id_absensi, jam_pulang, foto_pulang,
