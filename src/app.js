@@ -216,7 +216,11 @@ app.use((req, res, next) => {
 
 app.use((err, req, res, next) => {
     console.error("EXPRESS GLOBAL ERROR:", err);
-    res.status(500).send("Global Server Error: " + err.message);
+    if (req.path.startsWith('/api')) {
+        res.status(500).json({ status: 'error', message: err.message || 'Global Server Error' });
+    } else {
+        res.status(500).send("Global Server Error: " + err.message);
+    }
 });
 
 module.exports = app;

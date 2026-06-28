@@ -24,8 +24,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ 
     storage: storage,
-    // [REKOMENDASI] Batasi ukuran file maksimal 2MB untuk mencegah unggahan file besar
-    limits: { fileSize: 2 * 1024 * 1024 } 
+    // [REKOMENDASI] Batasi ukuran file maksimal 10MB untuk mencegah unggahan file besar
+    limits: { fileSize: 10 * 1024 * 1024 } 
 });
 
 // ==========================================
