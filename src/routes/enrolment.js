@@ -201,6 +201,22 @@ router.post('/:id/siswa', async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'Siswa sudah ada di kelas ini' });
         }
 
+        const targetClass = await prisma.enrolmentKelas.findUnique({ where: { id: enrolmentKelasId } });
+        if (!targetClass) {
+            return res.status(404).json({ status: 'error', message: 'Kelas tidak ditemukan' });
+        }
+
+        const existingInTa = await prisma.enrolmentSiswa.findFirst({
+            where: {
+                siswaId: parseInt(siswaId),
+                enrolmentKelas: { tahunAkademikId: targetClass.tahunAkademikId }
+            }
+        });
+        
+        if (existingInTa) {
+            return res.status(400).json({ status: 'error', message: 'Siswa sudah terdaftar di kelas lain pada tahun ajaran ini' });
+        }
+
         const newSiswa = await prisma.enrolmentSiswa.create({
             data: {
                 enrolmentKelasId,
