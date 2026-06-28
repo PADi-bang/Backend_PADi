@@ -85,7 +85,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     if (distance > FACE_RECOGNITION_THRESHOLD) {
       // [PENTING] Hapus file sampah karena absensi dibatalkan
       if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (wajah):", err));
-      return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
+      return res.status(400).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
     }
 
     if (siswa.sekolah.isGeofenceActive) {
@@ -105,7 +105,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
       if (!locationCheckResult[0]?.isWithinArea) {
           // [PENTING] Hapus file sampah karena absensi dibatalkan
           if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (luar area):", err));
-          return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+          return res.status(400).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
       }
     }
 
@@ -135,7 +135,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     });
 
     if (!jadwal) return res.status(404).json({ status: 'error', message: `Belum ada jadwal yang diaktifkan oleh Admin.` });
-    if (jadwal.isLibur) return res.status(403).json({ status: 'error', message: `Hari ini ditetapkan sebagai hari libur oleh Admin.` });
+    if (jadwal.isLibur) return res.status(400).json({ status: 'error', message: `Hari ini ditetapkan sebagai hari libur oleh Admin.` });
 
     let berlakuHariIni = false;
     
@@ -287,7 +287,7 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
     const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
     if (distance > 1.4) {
       if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (wajah):", err));
-      return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
+      return res.status(400).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
     }
 
     if (siswa.sekolah.isGeofenceActive) {
@@ -301,7 +301,7 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
 
       if (!locationCheckResult?.[0]?.isWithinArea) {
           if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (luar area):", err));
-          return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+          return res.status(400).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
       }
     }
 
@@ -359,7 +359,7 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
             
             // [PENTING] Hapus file sampah karena absensi dibatalkan
             if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (belum waktu pulang):", err));
-            return res.status(403).json({ 
+            return res.status(400).json({ 
                 status: 'error', 
                 message: `Belum waktunya pulang. Jadwal kepulangan hari ini adalah pukul ${strBatasJam}:${strBatasMenit} WIB.` 
             });
