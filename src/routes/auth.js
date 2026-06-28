@@ -202,4 +202,31 @@ router.get('/users', verifyToken, async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Terjadi kesalahan server' });
   }
 });
+
+// PUT /api/auth/fcm-token
+// Menyimpan atau memperbarui FCM Token milik pengguna
+router.put('/fcm-token', verifyToken, async (req, res) => {
+  try {
+    const { userId, fcmToken } = req.body;
+
+    if (!userId || !fcmToken) {
+      return res.status(400).json({ status: 'error', message: 'userId dan fcmToken wajib diisi' });
+    }
+
+    // Update FCM token di database
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(userId) },
+      data: { fcmToken: fcmToken }
+    });
+
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'FCM Token berhasil diperbarui' 
+    });
+  } catch (err) {
+    console.error('Error update FCM Token:', err);
+    res.status(500).json({ status: 'error', message: 'Gagal memperbarui FCM Token' });
+  }
+});
+
 module.exports = router;
