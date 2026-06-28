@@ -46,6 +46,11 @@ app.use(session({
 // --- JADWAL OTOMATIS (CRON JOBS) & INIT ---
 const cron = require('node-cron');
 const bcrypt = require('bcryptjs');
+const { initCronNotifications } = require('./utils/cronNotifications');
+
+// Inisialisasi notifikasi terjadwal
+initCronNotifications();
+
 const prismaCron = new PrismaClient();
 
 // Inisialisasi Admin Default

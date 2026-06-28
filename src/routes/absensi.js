@@ -5,6 +5,8 @@ const { Prisma } = require('@prisma/client');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const { sendPushNotification } = require('../utils/firebase');
+
 
 
 /**
@@ -68,7 +70,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
   try {
     const siswa = await prisma.siswa.findUnique({ 
       where: { userId: parseInt(userId) },
-      include: { sekolah: true } 
+      include: { sekolah: true, user: true } 
     });
 
     if (!siswa) return res.status(404).json({ status: 'error', message: 'Profil siswa tidak ditemukan.' });
@@ -235,6 +237,24 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     `);
 
     const absensiBaru = result[0];
+    await prisma.notifikasi.create({
+      data: {
+        userId: parseInt(userId),
+        judul: 'Absensi Berhasil',
+        tipe: 'Sistem',
+        isiPesan: `Anda berhasil melakukan absensi masuk. Status: ${status}`,
+      }
+    });
+
+    if (siswa.user && siswa.user.fcmToken) {
+      await sendPushNotification(
+        siswa.user.fcmToken,
+        'Absensi Berhasil',
+        `Anda berhasil melakukan absensi masuk. Status: ${status}`,
+        { type: 'absensi' }
+      ).catch(e => console.error('Gagal kirim notif absen masuk:', e));
+    }
+
     res.status(201).json({ status: 'success', message: `Absensi berhasil! Status: ${status}`, data: absensiBaru });
 
   } catch (err) {
@@ -256,7 +276,7 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
   try {
     const siswa = await prisma.siswa.findUnique({ 
       where: { userId: parseInt(userId) },
-      include: { sekolah: true } 
+      include: { sekolah: true, user: true } 
     });
 
     if (!siswa) return res.status(404).json({ status: 'error', message: 'Profil siswa tidak ditemukan.' });
@@ -384,6 +404,24 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
         id_absensi, jam_pulang, foto_pulang,
         ST_AsGeoJSON(koordinat_pulang) as koordinat_pulang;
     `);
+
+    await prisma.notifikasi.create({
+      data: {
+        userId: parseInt(userId),
+        judul: 'Absensi Pulang Berhasil',
+        tipe: 'Sistem',
+        isiPesan: 'Anda berhasil melakukan absensi pulang.',
+      }
+    });
+
+    if (siswa.user && siswa.user.fcmToken) {
+      await sendPushNotification(
+        siswa.user.fcmToken,
+        'Absensi Pulang Berhasil',
+        'Anda berhasil melakukan absensi pulang.',
+        { type: 'absensi_pulang' }
+      ).catch(e => console.error('Gagal kirim notif absen pulang:', e));
+    }
 
     res.status(200).json({ status: 'success', message: 'Absensi pulang berhasil!', data: result[0] });
 
