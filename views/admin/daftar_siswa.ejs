@@ -695,10 +695,18 @@
                 const face = predictions[0];
                 const start = face.topLeft;
                 const end = face.bottomRight;
-                const baseCropX = start[0];
-                const baseCropY = start[1];
-                const baseCropW = end[0] - start[0];
-                const baseCropH = end[1] - start[1];
+                const rawCropX = start[0];
+                const rawCropY = start[1];
+                const rawCropW = end[0] - start[0];
+                const rawCropH = end[1] - start[1];
+
+                // [PERBAIKAN KURSUS BLAZEFACE VS GOOGLE ML KIT]
+                // BlazeFace hanya mendeteksi "inner facial core" (alis hingga mulut), sedangkan Google ML Kit di Flutter mendeteksi "full head" (dahi hingga dagu).
+                // Perluasan kotak BlazeFace sebesar 35% agar proporsi zoom-nya sama persis dengan potongan Google ML Kit di HP siswa.
+                const baseCropW = rawCropW * 1.35;
+                const baseCropH = rawCropH * 1.35;
+                const baseCropX = rawCropX - (rawCropW * 0.175);
+                const baseCropY = rawCropY - (rawCropH * 0.25); // Geser ke atas untuk memasukkan dahi
 
                 // Terapkan Square Crop agar wajah tidak gepeng/terdistorsi saat di-resize ke 112x112
                 const maxDimension = Math.max(baseCropW, baseCropH);
