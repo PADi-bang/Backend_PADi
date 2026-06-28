@@ -699,10 +699,20 @@
                 const scaleX = imgWidth / previewImg.width;
                 const scaleY = imgHeight / previewImg.height;
 
-                const cropX = start[0] * scaleX;
-                const cropY = start[1] * scaleY;
-                const cropW = size[0] * scaleX;
-                const cropH = size[1] * scaleY;
+                const baseCropX = start[0] * scaleX;
+                const baseCropY = start[1] * scaleY;
+                const baseCropW = size[0] * scaleX;
+                const baseCropH = size[1] * scaleY;
+
+                // Terapkan Square Crop agar wajah tidak gepeng/terdistorsi saat di-resize ke 112x112
+                const maxDimension = Math.max(baseCropW, baseCropH);
+                const centerX = baseCropX + baseCropW / 2;
+                const centerY = baseCropY + baseCropH / 2;
+
+                const cropX = Math.max(0, centerX - maxDimension / 2);
+                const cropY = Math.max(0, centerY - maxDimension / 2);
+                const cropW = maxDimension;
+                const cropH = maxDimension;
 
                 ctx.drawImage(previewImg, cropX, cropY, cropW, cropH, 0, 0, 112, 112);
 
