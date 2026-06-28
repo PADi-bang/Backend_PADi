@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const viewsDir = path.join(__dirname, 'backend/views/admin');
+const viewsDir = path.join(__dirname, '../views/admin');
 const files = fs.readdirSync(viewsDir).filter(f => f.endsWith('.ejs'));
 
 const icons = {

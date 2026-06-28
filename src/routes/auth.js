@@ -141,7 +141,13 @@ router.post('/login', async (req, res) => {
             // Format GeoJSON adalah [ [ [lon, lat], [lon, lat] ] ]. Kita ambil array koordinatnya.
             // Flutter mengharapkan array pasangan koordinat: [[lon, lat], [lon, lat], ...]
             responseData.geofence = {
+              isActive: siswa.sekolah.isGeofenceActive,
               polygon: geoJson.coordinates[0] 
+            };
+          } else {
+            responseData.geofence = {
+              isActive: siswa.sekolah.isGeofenceActive,
+              polygon: null
             };
           }
         }

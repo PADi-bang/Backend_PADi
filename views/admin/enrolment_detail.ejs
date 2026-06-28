@@ -53,6 +53,9 @@
             <a href="/enrolment" class="flex items-center gap-4 p-3.5 bg-primary text-white rounded-2xl shadow-lg shadow-primary/40 transition">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg> Enrolment Kelas
             </a>
+            <a href="/lokasi-sekolah" class="flex items-center gap-4 p-3.5 hover:text-white hover:bg-white/10 rounded-2xl transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg> Lokasi Sekolah
+            </a>
         </nav>
         <div class="mt-auto mb-4">
             <a href="/logout" class="flex justify-center items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3.5 px-4 rounded-full transition shadow-lg shadow-primary/30">
@@ -142,7 +145,7 @@
                         <% if (detail.enrolment.enrolmentSiswa.length > 0) { %>
                             <% detail.enrolment.enrolmentSiswa.forEach(function(es) { %>
                                 <tr class="hover:bg-slate-50">
-                                    <td class="px-4 py-3 font-bold text-blue-600 hover:underline">
+                                    <td class="px-4 py-3 font-bold text-primary hover:underline">
                                         <a href="/daftar-siswa?search=<%= encodeURIComponent(es.siswa.namaLengkap) %>" title="Lihat detail di Daftar Siswa">
                                             <%= es.siswa.namaLengkap %>
                                         </a>

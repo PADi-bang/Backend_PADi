@@ -11,6 +11,18 @@ const upload = multer({ dest: os.tmpdir() });
 
 // --- MIDDLEWARE AUTH ---
 const checkAdminAuth = (req, res, next) => {
+    // Izinkan akses ke aset statis publik sebelum login
+    if (
+        req.path.startsWith('/images/') || 
+        req.path.startsWith('/stylesheets/') || 
+        req.path.startsWith('/icons/') || 
+        req.path.startsWith('/models/') || 
+        req.path === '/favicon.png' || 
+        req.path === '/manifest.json'
+    ) {
+        return next();
+    }
+
     if (req.session && req.session.adminId) {
         return next();
     }
@@ -782,6 +794,133 @@ router.get('/jadwal', async (req, res) => {
         res.render('admin/jadwal', { jadwalList, kelasList });
     } catch (err) {
         res.render('admin/error', { message: err.message });
+    }
+});
+
+// 7. LOKASI SEKOLAH
+router.get('/lokasi-sekolah', async (req, res) => {
+    try {
+        const admin = await prisma.admin.findUnique({
+            where: { userId: req.session.adminId }
+        });
+        const sekolahId = admin ? admin.sekolahId : 1;
+
+        const result = await prisma.$queryRaw`
+            SELECT id_sekolah, nama_sekolah, alamat, ST_AsGeoJSON(area_sekolah) as polygon_geojson, is_active_geofence as "isGeofenceActive"
+            FROM sekolah 
+            WHERE id_sekolah = ${sekolahId}
+        `;
+        
+        if (result.length === 0) {
+            return res.render('admin/error', { message: 'Data sekolah tidak ditemukan' });
+        }
+
+        const sekolah = result[0];
+        res.render('admin/lokasi_sekolah', { 
+            title: 'Lokasi Sekolah', 
+            sekolah,
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (err) {
+        res.render('admin/error', { message: err.message });
+    }
+});
+
+router.post('/lokasi-sekolah', async (req, res) => {
+    const { namaSekolah, alamat, coordinates, isGeofenceActive, isMapEdited } = req.body;
+    const isGeofenceActiveBool = isGeofenceActive === 'true';
+    const isMapEditedBool = isMapEdited === 'true';
+    try {
+        const admin = await prisma.admin.findUnique({
+            where: { userId: req.session.adminId }
+        });
+        const sekolahId = admin ? admin.sekolahId : 1;
+
+        const existingSekolah = await prisma.sekolah.findUnique({
+            where: { id: sekolahId }
+        });
+        if (!existingSekolah) {
+            throw new Error("Data sekolah tidak ditemukan.");
+        }
+
+        let hasCoordinates = false;
+        let polyStr = null;
+
+        if (coordinates && coordinates.trim() !== '') {
+            try {
+                const parsedCoords = JSON.parse(coordinates); // Expected: [[lng, lat], [lng, lat], ...]
+                if (Array.isArray(parsedCoords) && parsedCoords.length >= 3) {
+                    // Ensure the polygon closes (first and last coordinate must be identical in WKT)
+                    const first = parsedCoords[0];
+                    const last = parsedCoords[parsedCoords.length - 1];
+                    if (first[0] !== last[0] || first[1] !== last[1]) {
+                        parsedCoords.push(first);
+                    }
+
+                    // Format to WKT: POLYGON((lng1 lat1, lng2 lat2, ..., lng1 lat1))
+                    const wktPoints = parsedCoords.map(pt => `${pt[0]} ${pt[1]}`).join(', ');
+                    polyStr = `POLYGON((${wktPoints}))`;
+                    hasCoordinates = true;
+                }
+            } catch (e) {
+                console.error("Gagal parse koordinat JSON:", e);
+            }
+        }
+
+        if (isGeofenceActiveBool && !hasCoordinates) {
+            throw new Error("Batas wilayah (area geofence) wajib digambar di peta apabila status geofencing aktif.");
+        }
+
+        // Generate customized success message based on what changed
+        let changeMessages = [];
+        if (existingSekolah.isGeofenceActive !== isGeofenceActiveBool) {
+            const statusStr = isGeofenceActiveBool ? 'diaktifkan' : 'dinonaktifkan';
+            changeMessages.push(`status geofencing sekolah berhasil ${statusStr}`);
+        }
+        
+        const isInfoChanged = existingSekolah.namaSekolah !== namaSekolah || existingSekolah.alamat !== alamat || isMapEditedBool;
+        if (isInfoChanged) {
+            changeMessages.push(`informasi lokasi sekolah berhasil diperbarui`);
+        }
+
+        let successMsg = "Perubahan lokasi berhasil disimpan";
+        if (changeMessages.length > 0) {
+            successMsg = changeMessages.join(' dan ');
+            successMsg = successMsg.charAt(0).toUpperCase() + successMsg.slice(1);
+        }
+
+        // Update database (sekolah info and active toggle)
+        await prisma.sekolah.update({
+            where: { id: sekolahId },
+            data: { 
+                namaSekolah, 
+                alamat,
+                isGeofenceActive: isGeofenceActiveBool
+            }
+        });
+
+        // Update polygon area ONLY if map was edited
+        if (isMapEditedBool) {
+            if (hasCoordinates && polyStr) {
+                await prisma.$executeRaw`
+                    UPDATE sekolah 
+                    SET area_sekolah = ST_GeomFromText(${polyStr}, 4326) 
+                    WHERE id_sekolah = ${sekolahId}
+                `;
+            } else if (!hasCoordinates) {
+                await prisma.$executeRaw`
+                    UPDATE sekolah 
+                    SET area_sekolah = NULL 
+                    WHERE id_sekolah = ${sekolahId}
+                `;
+            }
+        }
+
+        res.redirect(`/lokasi-sekolah?success=${encodeURIComponent(successMsg)}`);
+    } catch (err) {
+        console.error("Error updating school location:", err);
+        res.redirect(`/lokasi-sekolah?error=${encodeURIComponent(err.message)}`);
     }
 });
 

@@ -86,23 +86,25 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
       return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
     }
 
-    const locationCheckResult = await prisma.$queryRaw`
-        SELECT ST_Covers(
-            area_sekolah, 
-            ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
-        ) as "isWithinArea"
-        FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
-    `;
+    if (siswa.sekolah.isGeofenceActive) {
+      const locationCheckResult = await prisma.$queryRaw`
+          SELECT ST_Covers(
+              area_sekolah, 
+              ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
+          ) as "isWithinArea"
+          FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
+      `;
 
-    if (!locationCheckResult || !Array.isArray(locationCheckResult) || locationCheckResult.length === 0) {
-        // [PENTING] Hapus file sampah karena validasi gagal di server
-        if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (validasi lokasi):", err));
-        return res.status(500).json({ status: 'error', message: 'Gagal memvalidasi lokasi sekolah.' });
-    }
-    if (!locationCheckResult[0]?.isWithinArea) {
-        // [PENTING] Hapus file sampah karena absensi dibatalkan
-        if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (luar area):", err));
-        return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+      if (!locationCheckResult || !Array.isArray(locationCheckResult) || locationCheckResult.length === 0) {
+          // [PENTING] Hapus file sampah karena validasi gagal di server
+          if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (validasi lokasi):", err));
+          return res.status(500).json({ status: 'error', message: 'Gagal memvalidasi lokasi sekolah.' });
+      }
+      if (!locationCheckResult[0]?.isWithinArea) {
+          // [PENTING] Hapus file sampah karena absensi dibatalkan
+          if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (luar area):", err));
+          return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+      }
     }
 
     // Mengunci waktu saat ini ke WIB murni
@@ -268,17 +270,19 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
       return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali.` });
     }
 
-    const locationCheckResult = await prisma.$queryRaw`
-        SELECT ST_Covers(
-            area_sekolah, 
-            ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
-        ) as "isWithinArea"
-        FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
-    `;
+    if (siswa.sekolah.isGeofenceActive) {
+      const locationCheckResult = await prisma.$queryRaw`
+          SELECT ST_Covers(
+              area_sekolah, 
+              ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
+          ) as "isWithinArea"
+          FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
+      `;
 
-    if (!locationCheckResult?.[0]?.isWithinArea) {
-        if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (luar area):", err));
-        return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+      if (!locationCheckResult?.[0]?.isWithinArea) {
+          if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (luar area):", err));
+          return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+      }
     }
 
     const now = new Date();
