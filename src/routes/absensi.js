@@ -80,7 +80,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     const storedEmbedding = JSON.parse(siswa.faceModel);
     const faceEmbedding = JSON.parse(faceEmbeddingJson); // [DIUBAH] Parse JSON string dari form-data
     const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
-    const FACE_RECOGNITION_THRESHOLD = 0.8; 
+    const FACE_RECOGNITION_THRESHOLD = 1.4; // Dilonggarkan agar lebih mudah dikenali
 
     if (distance > FACE_RECOGNITION_THRESHOLD) {
       // [PENTING] Hapus file sampah karena absensi dibatalkan
@@ -285,9 +285,9 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
     const storedEmbedding = JSON.parse(siswa.faceModel);
     const faceEmbedding = JSON.parse(faceEmbeddingJson); // [DIUBAH] Parse JSON string dari form-data
     const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
-    if (distance > 0.8) {
+    if (distance > 1.4) {
       if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (wajah):", err));
-      return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali.` });
+      return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
     }
 
     if (siswa.sekolah.isGeofenceActive) {
