@@ -5,6 +5,7 @@ const multer = require('multer');
 const fs = require('fs').promises; // Gunakan 'fs' promise-based untuk async/await
 const path = require('path');
 const { sendPushNotification } = require('../utils/firebase'); // [BARU] Import util firebase
+const verifyToken = require('../middleware/auth'); // [BARU] Import middleware auth
 
 const prisma = new PrismaClient();
 
@@ -140,15 +141,47 @@ router.post('/', upload.single('fileBukti'), async (req, res) => {
 // 2. GURU MELIHAT DAFTAR IZIN PENDING
 // GET /api/perizinan/pending
 // ==========================================
-router.get('/pending', async (req, res) => {
+router.get('/pending', verifyToken, async (req, res) => {
     try {
-        const izinPending = await prisma.perizinan.findMany({
-            where: { status: 'Pending' },
-            include: { siswa: true },
-            orderBy: { createdAt: 'desc' }
-        });
+        let izinPending = [];
+
+        // Jika yang login adalah Guru, ambil izin HANYA dari siswa di kelas yang dia ajar
+        if (req.user.role === 'Guru') {
+            const guru = await prisma.guru.findUnique({ where: { userId: req.user.id } });
+            if (guru) {
+                // Cari kelas-kelas yang diajar oleh guru ini
+                const kelasAjar = await prisma.enrolmentGuru.findMany({
+                    where: { guruId: guru.id, isActive: true },
+                    select: { enrolmentKelasId: true }
+                });
+                const kelasIds = kelasAjar.map(k => k.enrolmentKelasId);
+
+                // Cari siswa-siswa yang ada di kelas-kelas tersebut
+                const siswaDiKelas = await prisma.enrolmentSiswa.findMany({
+                    where: { enrolmentKelasId: { in: kelasIds }, isActive: true },
+                    select: { siswaId: true }
+                });
+                const siswaIds = siswaDiKelas.map(s => s.siswaId);
+
+                // Ambil izin HANYA untuk siswa-siswa tersebut
+                izinPending = await prisma.perizinan.findMany({
+                    where: { status: 'Pending', siswaId: { in: siswaIds } },
+                    include: { siswa: true },
+                    orderBy: { createdAt: 'desc' }
+                });
+            }
+        } else {
+            // Jika admin/lainnya, ambil semua (atau sesuaikan dengan kebutuhan bisnis)
+            izinPending = await prisma.perizinan.findMany({
+                where: { status: 'Pending' },
+                include: { siswa: true },
+                orderBy: { createdAt: 'desc' }
+            });
+        }
+
         res.status(200).json({ status: 'success', data: izinPending });
     } catch (err) {
+        console.error("Error fetching pending izin:", err);
         res.status(500).json({ status: 'error', message: 'Gagal mengambil data' });
     }
 });
