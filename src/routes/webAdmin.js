@@ -188,8 +188,9 @@ router.post('/daftar-siswa/set-wajah', upload.single('fotoWajah'), async (req, r
             return res.status(404).json({ status: 'error', message: 'Siswa tidak ditemukan' });
         }
 
-        // Eksekusi skrip Python
-        const pythonProcess = spawn('python', [
+        // Eksekusi skrip Python menggunakan environment variable agar konsisten
+        const pythonExecutable = process.env.PYTHON_PATH || 'python';
+        const pythonProcess = spawn(pythonExecutable, [
             path.join(__dirname, '../utils/extract_face.py'),
             req.file.path
         ]);

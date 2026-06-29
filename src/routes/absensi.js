@@ -65,7 +65,8 @@ const { spawn } = require('child_process');
  */
 function extractFaceWithPython(imagePath) {
   return new Promise((resolve, reject) => {
-    const pythonProcess = spawn('python', [
+    const pythonExecutable = process.env.PYTHON_PATH || 'python';
+    const pythonProcess = spawn(pythonExecutable, [
       path.join(__dirname, '../utils/extract_face.py'),
       imagePath
     ]);
