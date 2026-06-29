@@ -23,7 +23,7 @@ router.get('/login', (req, res) => {
 router.post('/login', (req, res) => {
     const { username, password } = req.body;
     // Hardcoded dev credentials as requested: username admin, password admin
-    if (username === 'admin' && password === 'admin') {
+    if (username && username.toLowerCase() === 'admin' && password === 'admin') {
         req.session.devAdminAuth = true;
         res.redirect('/devadmin');
     } else {

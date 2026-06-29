@@ -200,13 +200,19 @@
             <h2 class="text-2xl font-bold mb-6">Tambah Admin</h2>
             <form action="/devadmin/admin" method="POST" class="space-y-4">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Nama Lengkap</label>
-                    <input type="text" name="namaAdmin" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs text-slate-400 uppercase font-bold">Nama Lengkap</label>
+                        <label class="flex items-center text-xs text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="syncUsernameTambah" checked class="mr-1" onchange="toggleSync('Tambah')">
+                            Samakan dgn Username
+                        </label>
+                    </div>
+                    <input type="text" name="namaAdmin" id="namaAdminTambah" readonly required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent opacity-50 cursor-not-allowed">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Username</label>
-                        <input type="text" name="username" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                        <input type="text" name="username" id="usernameTambah" oninput="syncUsername('Tambah')" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
                     </div>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Email</label>
@@ -238,13 +244,19 @@
             <h2 class="text-2xl font-bold mb-6">Edit Admin</h2>
             <form id="formEditAdmin" method="POST" class="space-y-4">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Nama Lengkap</label>
-                    <input type="text" name="namaAdmin" id="editNamaAdmin" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs text-slate-400 uppercase font-bold">Nama Lengkap</label>
+                        <label class="flex items-center text-xs text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="syncUsernameEdit" class="mr-1" onchange="toggleSync('Edit')">
+                            Samakan dgn Username
+                        </label>
+                    </div>
+                    <input type="text" name="namaAdmin" id="namaAdminEdit" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Username</label>
-                        <input type="text" name="username" id="editUsername" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                        <input type="text" name="username" id="usernameEdit" oninput="syncUsername('Edit')" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
                     </div>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Email</label>
@@ -295,11 +307,49 @@
 
         function editAdmin(id, nama, username, email, sekolahId) {
             document.getElementById('formEditAdmin').action = `/devadmin/admin/edit/${id}`;
-            document.getElementById('editNamaAdmin').value = nama;
-            document.getElementById('editUsername').value = username;
+            const namaInput = document.getElementById('namaAdminEdit');
+            const usernameInput = document.getElementById('usernameEdit');
+            const syncCheck = document.getElementById('syncUsernameEdit');
+            
+            namaInput.value = nama;
+            usernameInput.value = username;
             document.getElementById('editEmail').value = email;
             if(sekolahId) document.getElementById('editSekolahId').value = sekolahId;
+            
+            // Check if nama and username are the same
+            if (nama === username) {
+                syncCheck.checked = true;
+                namaInput.readOnly = true;
+                namaInput.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                syncCheck.checked = false;
+                namaInput.readOnly = false;
+                namaInput.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            
             toggleModal('modalEditAdmin');
+        }
+
+        function toggleSync(mode) {
+            const syncCheck = document.getElementById(`syncUsername${mode}`);
+            const namaInput = document.getElementById(`namaAdmin${mode}`);
+            const usernameInput = document.getElementById(`username${mode}`);
+            
+            if (syncCheck.checked) {
+                namaInput.value = usernameInput.value;
+                namaInput.readOnly = true;
+                namaInput.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                namaInput.readOnly = false;
+                namaInput.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function syncUsername(mode) {
+            const syncCheck = document.getElementById(`syncUsername${mode}`);
+            if (syncCheck.checked) {
+                document.getElementById(`namaAdmin${mode}`).value = document.getElementById(`username${mode}`).value;
+            }
         }
 
         function confirmDel(e) {
