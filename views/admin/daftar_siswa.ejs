@@ -504,6 +504,31 @@
             toggleModal('modalEditSiswa');
         }
 
+        function bukaUploadWajah(button) {
+            const id = button.getAttribute('data-id');
+            const nama = button.getAttribute('data-nama');
+
+            document.getElementById('wajahSiswaUserId').value = id;
+            document.getElementById('wajahSiswaNama').textContent = nama;
+            
+            // Reset upload form
+            const input = document.getElementById('inputFotoWajah');
+            const placeholder = document.getElementById('wajahPlaceholder');
+            const fileInfo = document.getElementById('wajahFileInfo');
+            const previewImg = document.getElementById('wajahPreview');
+            const btnSimpan = document.getElementById('btnSimpanWajah');
+            const statusContainer = document.getElementById('wajahStatusContainer');
+
+            input.value = '';
+            placeholder.classList.remove('hidden');
+            fileInfo.classList.add('hidden');
+            previewImg.src = '';
+            btnSimpan.disabled = true;
+            statusContainer.classList.add('hidden');
+
+            toggleModal('modalUploadWajah');
+        }
+
         function confirmDelete(e, form) {
             e.preventDefault();
             Swal.fire({
