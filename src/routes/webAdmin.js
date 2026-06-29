@@ -112,7 +112,7 @@ router.get('/daftar-siswa', async (req, res) => {
             },
             orderBy: { id: 'desc' }
         });
-        const masterAngkatan = await prisma.masterAngkatan.findMany({ where: { isActive: true, sekolahId: req.session.sekolahId } });
+        const masterAngkatan = await prisma.masterAngkatan.findMany({ where: { sekolahId: req.session.sekolahId }, orderBy: { nomorAngkatan: 'asc' } });
         res.render('admin/daftar_siswa', { title: 'Daftar Siswa', siswas, masterAngkatan, search: search || '' });
     } catch (err) {
         res.render('admin/error', { message: err.message });
