@@ -78,8 +78,17 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     if (!siswa.sekolah) return res.status(404).json({ status: 'error', message: 'Data sekolah tidak ditemukan.' });
 
     const storedEmbedding = JSON.parse(siswa.faceModel);
-    const faceEmbedding = JSON.parse(faceEmbeddingJson); // [DIUBAH] Parse JSON string dari form-data
-    const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
+    const faceEmbeddingInput = JSON.parse(faceEmbeddingJson); // Parse JSON string dari form-data
+    
+    let distance;
+    if (Array.isArray(faceEmbeddingInput) && faceEmbeddingInput.length > 0 && Array.isArray(faceEmbeddingInput[0])) {
+      // 2D Array: bandingkan kedua versi (normal & flipped) dan ambil jarak terkecil
+      const distances = faceEmbeddingInput.map(emb => calculateEuclideanDistance(emb, storedEmbedding));
+      distance = Math.min(...distances);
+    } else {
+      // 1D Array: fallback kompatibilitas ke belakang
+      distance = calculateEuclideanDistance(faceEmbeddingInput, storedEmbedding);
+    }
     const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD) || 0.95;
 
     if (distance > FACE_RECOGNITION_THRESHOLD) {
@@ -283,8 +292,17 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
     if (!siswa.faceModel) return res.status(400).json({ status: 'error', message: 'Belum mendaftarkan wajah.' });
 
     const storedEmbedding = JSON.parse(siswa.faceModel);
-    const faceEmbedding = JSON.parse(faceEmbeddingJson); // [DIUBAH] Parse JSON string dari form-data
-    const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
+    const faceEmbeddingInput = JSON.parse(faceEmbeddingJson); // Parse JSON string dari form-data
+    
+    let distance;
+    if (Array.isArray(faceEmbeddingInput) && faceEmbeddingInput.length > 0 && Array.isArray(faceEmbeddingInput[0])) {
+      // 2D Array: bandingkan kedua versi (normal & flipped) dan ambil jarak terkecil
+      const distances = faceEmbeddingInput.map(emb => calculateEuclideanDistance(emb, storedEmbedding));
+      distance = Math.min(...distances);
+    } else {
+      // 1D Array: fallback kompatibilitas ke belakang
+      distance = calculateEuclideanDistance(faceEmbeddingInput, storedEmbedding);
+    }
     const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD) || 0.95;
     if (distance > FACE_RECOGNITION_THRESHOLD) {
       if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (wajah):", err));
