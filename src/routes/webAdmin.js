@@ -11,6 +11,8 @@ const upload = multer({ dest: os.tmpdir() });
 
 // --- MIDDLEWARE AUTH ---
 const checkAdminAuth = require('../middleware/sessionAuth');
+const { spawn } = require('child_process');
+const path = require('path');
 
 // --- AUTH ROUTES ---
 router.get('/login', (req, res) => {
@@ -169,16 +171,15 @@ router.post('/daftar-siswa/delete/:id', async (req, res) => {
     }
 });
 
-// [BARU] DAFTAR WAJAH SISWA
-router.post('/daftar-siswa/set-wajah', async (req, res) => {
-    const { userId, faceEmbedding } = req.body;
+// [BARU] DAFTAR WAJAH SISWA (Menggunakan Python Backend)
+router.post('/daftar-siswa/set-wajah', upload.single('fotoWajah'), async (req, res) => {
+    const userId = req.body.userId;
+    
     try {
-        if (!userId || !faceEmbedding) {
-            return res.status(400).json({ status: 'error', message: 'User ID dan data wajah wajib diisi' });
+        if (!userId || !req.file) {
+            return res.status(400).json({ status: 'error', message: 'User ID dan foto wajah wajib diisi' });
         }
         
-        let faceModelString = typeof faceEmbedding === 'string' ? faceEmbedding : JSON.stringify(faceEmbedding);
-
         const siswa = await prisma.siswa.findUnique({
             where: { userId: parseInt(userId) }
         });
@@ -187,12 +188,59 @@ router.post('/daftar-siswa/set-wajah', async (req, res) => {
             return res.status(404).json({ status: 'error', message: 'Siswa tidak ditemukan' });
         }
 
-        await prisma.siswa.update({
-            where: { id: siswa.id },
-            data: { faceModel: faceModelString }
+        // Eksekusi skrip Python
+        const pythonProcess = spawn('python', [
+            path.join(__dirname, '../utils/extract_face.py'),
+            req.file.path
+        ]);
+
+        pythonProcess.on('error', (err) => {
+            console.error("Gagal menjalankan Python: " + err.message);
         });
 
-        res.status(200).json({ status: 'success', message: 'Wajah berhasil didaftarkan' });
+        let outputData = '';
+        let errorData = '';
+
+        pythonProcess.stdout.on('data', (data) => {
+            outputData += data.toString();
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+            errorData += data.toString();
+        });
+
+        pythonProcess.on('close', async (code) => {
+            // Hapus file sementara
+            const fs = require('fs').promises;
+            await fs.unlink(req.file.path).catch(e => console.error(e));
+
+            try {
+                // Skrip Python bisa mem-print pesan error dari TensorFlow sebelum JSON. 
+                // Kita cari baris yang berupa JSON.
+                const jsonStr = outputData.split('\n').map(l => l.trim()).find(l => l.startsWith('{') && l.endsWith('}'));
+                
+                if (!jsonStr) {
+                    console.error("Python Error:", errorData || outputData);
+                    return res.status(500).json({ status: 'error', message: 'Gagal mengekstrak wajah dari foto' });
+                }
+
+                const result = JSON.parse(jsonStr);
+                
+                if (result.status === 'success') {
+                    await prisma.siswa.update({
+                        where: { id: siswa.id },
+                        data: { faceModel: JSON.stringify(result.embedding) }
+                    });
+                    return res.status(200).json({ status: 'success', message: 'Wajah berhasil didaftarkan' });
+                } else {
+                    return res.status(400).json({ status: 'error', message: result.message || 'Wajah tidak terdeteksi dengan jelas' });
+                }
+            } catch (parseError) {
+                console.error("Parse Error:", parseError, "Raw output:", outputData);
+                return res.status(500).json({ status: 'error', message: 'Terjadi kesalahan sistem saat membaca hasil biometrik' });
+            }
+        });
+
     } catch (err) {
         console.error(err);
         res.status(500).json({ status: 'error', message: 'Terjadi kesalahan sistem saat menyimpan wajah' });

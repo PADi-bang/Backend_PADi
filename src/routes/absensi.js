@@ -58,13 +58,59 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
+const { spawn } = require('child_process');
+
+/**
+ * Menjalankan skrip Python untuk mendeteksi wajah dan mengekstrak embedding 192d.
+ */
+function extractFaceWithPython(imagePath) {
+  return new Promise((resolve, reject) => {
+    const pythonProcess = spawn('python', [
+      path.join(__dirname, '../utils/extract_face.py'),
+      imagePath
+    ]);
+
+    pythonProcess.on('error', (err) => {
+      reject(new Error("Gagal menjalankan Python: " + err.message));
+    });
+
+    let outputData = '';
+    let errorData = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      outputData += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorData += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      try {
+        const jsonStr = outputData.split('\n').map(l => l.trim()).find(l => l.startsWith('{') && l.endsWith('}'));
+        if (!jsonStr) {
+          return reject(new Error("Gagal mengekstrak wajah: " + (errorData || outputData)));
+        }
+        const result = JSON.parse(jsonStr);
+        if (result.status === 'success') {
+          resolve(result.embedding);
+        } else {
+          reject(new Error(result.message || 'Wajah tidak terdeteksi'));
+        }
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
 // POST /api/absensi/masuk
 router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
   // [DIUBAH] 'fotoMasuk' sekarang ada di req.file, sisanya di req.body
-  const { userId, faceEmbedding: faceEmbeddingJson, latitude, longitude } = req.body;
+  const { userId, latitude, longitude } = req.body;
 
-  if (!userId || !faceEmbeddingJson || latitude === undefined || longitude === undefined || !req.file) {
-    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, faceEmbedding, latitude, longitude, dan fotoMasuk wajib diisi.' });
+  if (!userId || latitude === undefined || longitude === undefined || !req.file) {
+    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, latitude, longitude, dan fotoMasuk wajib diisi.' });
   }
 
   try {
@@ -78,17 +124,17 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     if (!siswa.sekolah) return res.status(404).json({ status: 'error', message: 'Data sekolah tidak ditemukan.' });
 
     const storedEmbedding = JSON.parse(siswa.faceModel);
-    const faceEmbeddingInput = JSON.parse(faceEmbeddingJson); // Parse JSON string dari form-data
-
-    let distance;
-    if (Array.isArray(faceEmbeddingInput) && faceEmbeddingInput.length > 0 && Array.isArray(faceEmbeddingInput[0])) {
-      // 2D Array: bandingkan kedua versi (normal & flipped) dan ambil jarak terkecil
-      const distances = faceEmbeddingInput.map(emb => calculateEuclideanDistance(emb, storedEmbedding));
-      distance = Math.min(...distances);
-    } else {
-      // 1D Array: fallback kompatibilitas ke belakang
-      distance = calculateEuclideanDistance(faceEmbeddingInput, storedEmbedding);
+    
+    // [BARU] Ekstrak wajah menggunakan skrip Python di server
+    let faceEmbeddingInput;
+    try {
+      faceEmbeddingInput = await extractFaceWithPython(req.file.path);
+    } catch (err) {
+      if (req.file) await fs.unlink(req.file.path).catch(e => console.error(e));
+      return res.status(400).json({ status: 'error', message: err.message });
     }
+
+    let distance = calculateEuclideanDistance(faceEmbeddingInput, storedEmbedding);
     const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD) || 0.95;
 
     if (distance > FACE_RECOGNITION_THRESHOLD) {
@@ -276,10 +322,10 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
 
 // POST /api/absensi/pulang
 router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
-  const { userId, faceEmbedding: faceEmbeddingJson, latitude, longitude } = req.body;
+  const { userId, latitude, longitude } = req.body;
 
-  if (!userId || !faceEmbeddingJson || latitude === undefined || longitude === undefined || !req.file) {
-    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, faceEmbedding, latitude, longitude, dan fotoPulang wajib diisi.' });
+  if (!userId || latitude === undefined || longitude === undefined || !req.file) {
+    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, latitude, longitude, dan fotoPulang wajib diisi.' });
   }
 
   try {
@@ -292,17 +338,17 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
     if (!siswa.faceModel) return res.status(400).json({ status: 'error', message: 'Belum mendaftarkan wajah.' });
 
     const storedEmbedding = JSON.parse(siswa.faceModel);
-    const faceEmbeddingInput = JSON.parse(faceEmbeddingJson); // Parse JSON string dari form-data
-
-    let distance;
-    if (Array.isArray(faceEmbeddingInput) && faceEmbeddingInput.length > 0 && Array.isArray(faceEmbeddingInput[0])) {
-      // 2D Array: bandingkan kedua versi (normal & flipped) dan ambil jarak terkecil
-      const distances = faceEmbeddingInput.map(emb => calculateEuclideanDistance(emb, storedEmbedding));
-      distance = Math.min(...distances);
-    } else {
-      // 1D Array: fallback kompatibilitas ke belakang
-      distance = calculateEuclideanDistance(faceEmbeddingInput, storedEmbedding);
+    
+    // [BARU] Ekstrak wajah menggunakan skrip Python di server
+    let faceEmbeddingInput;
+    try {
+      faceEmbeddingInput = await extractFaceWithPython(req.file.path);
+    } catch (err) {
+      if (req.file) await fs.unlink(req.file.path).catch(e => console.error(e));
+      return res.status(400).json({ status: 'error', message: err.message });
     }
+
+    let distance = calculateEuclideanDistance(faceEmbeddingInput, storedEmbedding);
     const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD) || 0.95;
     if (distance > FACE_RECOGNITION_THRESHOLD) {
       if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (wajah):", err));
