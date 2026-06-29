@@ -713,17 +713,25 @@
                 const centerX = baseCropX + baseCropW / 2;
                 const centerY = baseCropY + baseCropH / 2;
 
-                const cropX = Math.max(0, centerX - maxDimension / 2);
-                const cropY = Math.max(0, centerY - maxDimension / 2);
-                const cropW = maxDimension;
-                const cropH = maxDimension;
+                let cropX = Math.max(0, centerX - maxDimension / 2);
+                let cropY = Math.max(0, centerY - maxDimension / 2);
+                let cropW = maxDimension;
+                let cropH = maxDimension;
+
+                if (cropX + cropW > imgWidth) {
+                    cropW = imgWidth - cropX;
+                }
+                if (cropY + cropH > imgHeight) {
+                    cropH = imgHeight - cropY;
+                }
+                const finalDimension = Math.min(cropW, cropH);
 
                 const canvas = document.createElement('canvas');
                 canvas.width = 112;
                 canvas.height = 112;
                 const ctx = canvas.getContext('2d');
 
-                ctx.drawImage(offscreenCanvas, cropX, cropY, cropW, cropH, 0, 0, 112, 112);
+                ctx.drawImage(offscreenCanvas, cropX, cropY, finalDimension, finalDimension, 0, 0, 112, 112);
 
                 // Step 4: Extract Features / Inference
                 statusText.innerText = '🧬 Mengekstraksi biometrik wajah (192-dimensi)...';
