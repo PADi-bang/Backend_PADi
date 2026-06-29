@@ -583,6 +583,7 @@ router.get('/enrolment', async (req, res) => {
         if (!activeTa) activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: req.session.sekolahId } });
 
         const masterKelasList = await prisma.masterKelas.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { tingkat: true },
             orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });
@@ -654,8 +655,8 @@ router.get('/enrolment/:id', async (req, res) => {
         }
 
         const [allSiswa, allGuru] = await Promise.all([
-            prisma.siswa.findMany({ include: { masterAngkatan: true } }),
-            prisma.guru.findMany()
+            prisma.siswa.findMany({ where: { sekolahId: req.session.sekolahId }, include: { masterAngkatan: true } }),
+            prisma.guru.findMany({ where: { sekolahId: req.session.sekolahId } })
         ]);
 
         const detail = { enrolment, allSiswa, allGuru };
@@ -757,10 +758,12 @@ router.post('/enrolment/:id/proses-kenaikan', async (req, res) => {
 router.get('/jadwal', async (req, res) => {
     try {
         const jadwalListRaw = await prisma.jadwalAbsensi.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { kelas: { include: { tingkat: true } } },
             orderBy: { namaJadwal: 'asc' }
         });
         const kelasListRaw = await prisma.masterKelas.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { jadwalAbsensi: true, tingkat: true },
             orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });

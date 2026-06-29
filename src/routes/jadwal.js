@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 router.get('/', async (req, res) => {
     try {
         const jadwalListRaw = await prisma.jadwalAbsensi.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: {
                 kelas: { include: { tingkat: true } } // Ambil relasi kelas & tingkat
             },
@@ -17,6 +18,7 @@ router.get('/', async (req, res) => {
 
         // Ambil semua kelas untuk panel 'Kelas Yang Belum Terjadwal'
         const kelasListRaw = await prisma.masterKelas.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: {
                 jadwalAbsensi: true,
                 tingkat: true
@@ -262,6 +264,7 @@ router.put('/:id/activate', async (req, res) => {
 
         // Pertama, nonaktifkan semua jadwal
         await prisma.jadwalAbsensi.updateMany({
+            where: { sekolahId: req.session.sekolahId },
             data: { isActive: false }
         });
 

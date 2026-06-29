@@ -96,6 +96,7 @@ router.post('/pengaturan', async (req, res) => {
 router.get('/kelas', async (req, res) => {
     try {
         const kelasRaw = await prisma.masterKelas.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { sekolah: true, tingkat: true },
             orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });
@@ -225,6 +226,7 @@ router.delete('/kelas/group/:suffix', async (req, res) => {
 router.get('/angkatan', async (req, res) => {
     try {
         const angkatan = await prisma.masterAngkatan.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { sekolah: true },
             orderBy: { nomorAngkatan: 'asc' }
         });
@@ -307,6 +309,7 @@ router.delete('/angkatan/:id', async (req, res) => {
 router.get('/tahun-akademik', async (req, res) => {
     try {
         const tahunAkademik = await prisma.masterTahunAkademik.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { sekolah: true },
             orderBy: { tahunAjaran: 'asc' }
         });

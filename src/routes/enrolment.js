@@ -27,6 +27,7 @@ router.get('/', async (req, res) => {
         }
 
         const masterKelasList = await prisma.masterKelas.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { tingkat: true },
             orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });
@@ -87,9 +88,9 @@ router.get('/', async (req, res) => {
 router.get('/master-data', async (req, res) => {
     try {
         const [kelasRaw, angkatan, ta] = await Promise.all([
-            prisma.masterKelas.findMany({ include: { tingkat: true }, orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }] }),
-            prisma.masterAngkatan.findMany({ orderBy: { nomorAngkatan: 'asc' } }),
-            prisma.masterTahunAkademik.findMany({ orderBy: { tahunAjaran: 'asc' } })
+            prisma.masterKelas.findMany({ where: { sekolahId: req.session.sekolahId }, include: { tingkat: true }, orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }] }),
+            prisma.masterAngkatan.findMany({ where: { sekolahId: req.session.sekolahId }, orderBy: { nomorAngkatan: 'asc' } }),
+            prisma.masterTahunAkademik.findMany({ where: { sekolahId: req.session.sekolahId }, orderBy: { tahunAjaran: 'asc' } })
         ]);
         const kelas = kelasRaw.map(k => ({
             ...k,
@@ -174,8 +175,8 @@ router.get('/:id/detail', async (req, res) => {
 
         // Ambil semua siswa & guru yang ada di database untuk opsi dropdown "Tambah"
         const [allSiswa, allGuru] = await Promise.all([
-            prisma.siswa.findMany(),
-            prisma.guru.findMany()
+            prisma.siswa.findMany({ where: { sekolahId: req.session.sekolahId } }),
+            prisma.guru.findMany({ where: { sekolahId: req.session.sekolahId } })
         ]);
 
         res.status(200).json({ 
