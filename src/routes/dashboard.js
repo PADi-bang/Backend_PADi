@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
+const verifyToken = require('../middleware/auth');
 
 const prisma = new PrismaClient();
 
@@ -223,12 +224,20 @@ router.get('/stats', async (req, res) => {
 // 2. RUTE FLUTTER SISWA (KODE ASLI ANDA - TIDAK DIUBAH)
 // GET /api/dashboard/:userId
 // ==========================================
-router.get('/:userId', async (req, res) => {
+router.get('/:userId', verifyToken, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
 
+    // Keamanan: Cek apakah user yang request sesuai dengan ID token (atau memiliki role Guru/Admin)
+    if (req.user.id !== userId && req.user.role !== 'Guru' && req.user.role !== 'Admin') {
+      return res.status(403).json({ status: 'error', message: 'Akses ditolak: Anda tidak memiliki izin untuk melihat dashboard ini.' });
+    }
+
     const siswa = await prisma.siswa.findUnique({
-      where: { userId: userId }
+      where: { userId: userId },
+      include: {
+        sekolah: true
+      }
     });
 
     if (!siswa) {
@@ -236,6 +245,29 @@ router.get('/:userId', async (req, res) => {
     }
 
     const idSiswa = siswa.id;
+
+    // Ambil data geofence poligon menggunakan ST_AsGeoJSON
+    let geofence = null;
+    if (siswa.sekolah) {
+      geofence = {
+        isActive: siswa.sekolah.isGeofenceActive,
+        polygon: null
+      };
+
+      if (siswa.sekolahId) {
+        const geofenceResult = await prisma.$queryRaw`
+          SELECT ST_AsGeoJSON(area_sekolah) as polygon_geojson
+          FROM sekolah
+          WHERE id_sekolah = ${siswa.sekolahId} AND area_sekolah IS NOT NULL;
+        `;
+
+        if (geofenceResult.length > 0 && geofenceResult[0].polygon_geojson) {
+          const geoJson = JSON.parse(geofenceResult[0].polygon_geojson);
+          // Format GeoJSON adalah [ [ [lon, lat], [lon, lat] ] ]. Kita ambil array koordinatnya.
+          geofence.polygon = geoJson.coordinates[0];
+        }
+      }
+    }
 
     const hariIni = new Date();
     const awalBulan = new Date(hariIni.getFullYear(), hariIni.getMonth(), 1);
@@ -284,7 +316,8 @@ router.get('/:userId', async (req, res) => {
         persentaseKehadiran: persentase,
         riwayatAbsensi: riwayatAbsensi,
         riwayatPerizinan: riwayatPerizinan,
-        jadwalAktif: jadwalAktif
+        jadwalAktif: jadwalAktif,
+        geofence: geofence
       }
     });
 

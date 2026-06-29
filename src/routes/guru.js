@@ -1,13 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
+const verifyToken = require('../middleware/auth');
 
 const prisma = new PrismaClient();
 
 // GET /api/guru/dashboard/:userId
-router.get('/dashboard/:userId', async (req, res) => {
+router.get('/dashboard/:userId', verifyToken, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
+
+    // Keamanan: Cek apakah user yang request sesuai dengan ID token (atau memiliki role Admin)
+    if (req.user.id !== userId && req.user.role !== 'Admin') {
+      return res.status(403).json({ status: 'error', message: 'Akses ditolak: Anda tidak memiliki izin untuk melihat dashboard ini.' });
+    }
 
     const guru = await prisma.guru.findUnique({ where: { userId: userId } });
     if (!guru) return res.status(404).json({ status: 'error', message: 'Data profil guru tidak ditemukan' });
