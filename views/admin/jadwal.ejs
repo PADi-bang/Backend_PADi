@@ -378,7 +378,7 @@
             event.stopPropagation();
             if(confirm('Apakah Anda yakin ingin menghapus jadwal ini?')) {
                 try {
-                    const res = await fetch(`http://localhost:3000/api/jadwal/${id}`, { method: 'DELETE' });
+                    const res = await fetch(`/api/jadwal/${id}`, { method: 'DELETE' });
                     if(res.ok) {
                         window.location.reload();
                     } else {
@@ -393,7 +393,7 @@
             event.stopPropagation();
             if(confirm('Apakah Anda yakin ingin mengaktifkan jadwal ini? Jadwal lain akan otomatis dinonaktifkan.')) {
                 try {
-                    const res = await fetch(`http://localhost:3000/api/jadwal/${id}/activate`, { method: 'PUT' });
+                    const res = await fetch(`/api/jadwal/${id}/activate`, { method: 'PUT' });
                     if(res.ok) window.location.reload();
                     else alert('Gagal mengaktifkan jadwal');
                 } catch(err) { alert('Kesalahan jaringan'); }
@@ -404,7 +404,7 @@
             event.stopPropagation();
             if(confirm('Apakah Anda yakin ingin menonaktifkan jadwal ini?')) {
                 try {
-                    const res = await fetch(`http://localhost:3000/api/jadwal/${id}/deactivate`, { method: 'PUT' });
+                    const res = await fetch(`/api/jadwal/${id}/deactivate`, { method: 'PUT' });
                     if(res.ok) window.location.reload();
                     else alert('Gagal menonaktifkan jadwal');
                 } catch(err) { alert('Kesalahan jaringan'); }
@@ -451,7 +451,7 @@
             const id = data.id;
             delete data.id;
 
-            const url = id ? `http://localhost:3000/api/jadwal/${id}` : 'http://localhost:3000/api/jadwal';
+            const url = id ? `/api/jadwal/${id}` : '/api/jadwal';
             const method = id ? 'PUT' : 'POST';
 
             try {

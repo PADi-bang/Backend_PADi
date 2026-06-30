@@ -126,8 +126,9 @@ router.post('/kelas', async (req, res) => {
         }
 
         // Cek duplikasi
+        const safeSuffix = suffix.replace(/\\/g, '\\\\');
         const existing = await prisma.masterKelas.findFirst({
-            where: { namaKelas: { equals: suffix, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
+            where: { namaKelas: { equals: safeSuffix, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) {
             return res.status(400).json({ status: 'error', message: 'Nama kelas sudah ada' });
@@ -190,9 +191,10 @@ router.delete('/kelas/:id', async (req, res) => {
 router.delete('/kelas/group/:suffix', async (req, res) => {
     const suffix = req.params.suffix;
     try {
+        const safeSuffix = suffix.replace(/\\/g, '\\\\');
         // Find all classes matching the suffix
         const classes = await prisma.masterKelas.findMany({
-            where: { namaKelas: { equals: suffix, mode: 'insensitive' } }
+            where: { namaKelas: { equals: safeSuffix, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
 
         if (classes.length === 0) {
@@ -240,8 +242,10 @@ router.post('/angkatan', async (req, res) => {
     const { nomorAngkatan, sekolahId } = req.body;
     try {
         // Cek duplikasi
+        const formattedAngkatan = String(nomorAngkatan).trim();
+        const safeAngkatan = formattedAngkatan.replace(/\\/g, '\\\\');
         const existing = await prisma.masterAngkatan.findFirst({
-            where: { nomorAngkatan: { equals: nomorAngkatan, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
+            where: { nomorAngkatan: { equals: safeAngkatan, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) {
             return res.status(400).json({ status: 'error', message: 'Angkatan sudah ada' });
@@ -289,7 +293,9 @@ router.put('/angkatan/:id/toggle-active', async (req, res) => {
 router.delete('/angkatan/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
-        // Set angkatanId to null for any Siswa using this Angkatan
+        const angkatan = await prisma.masterAngkatan.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
+        if (!angkatan) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
+
         await prisma.siswa.updateMany({
             where: { angkatanId: id },
             data: { angkatanId: null }
@@ -322,9 +328,9 @@ router.get('/tahun-akademik', async (req, res) => {
 router.post('/tahun-akademik', async (req, res) => {
     const { tahunAjaran, isActive, sekolahId } = req.body;
     try {
-        // Cek duplikasi
+        const safeTahunAjaran = tahunAjaran.replace(/\\/g, '\\\\');
         const existing = await prisma.masterTahunAkademik.findFirst({
-            where: { tahunAjaran: { equals: tahunAjaran, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
+            where: { tahunAjaran: { equals: safeTahunAjaran, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) {
             return res.status(400).json({ status: 'error', message: 'Tahun akademik sudah ada' });
@@ -356,11 +362,11 @@ router.post('/tahun-akademik', async (req, res) => {
     }
 });
 
-router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
+router.put('/tahun-akademik/:id/activate', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
-        const ta = await prisma.masterTahunAkademik.findUnique({ where: { id } });
-        if(ta) {
+        const ta = await prisma.masterTahunAkademik.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
+        if (ta && !ta.isActive) {
             const newIsActive = !ta.isActive;
             let prevActiveTa = null;
 
@@ -531,6 +537,9 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
 router.delete('/tahun-akademik/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
+        const ta = await prisma.masterTahunAkademik.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
+        if (!ta) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
+
         // Find enrolments related to this TA to cascade delete
         const enrolments = await prisma.enrolmentKelas.findMany({ where: { tahunAkademikId: id } });
         for (const e of enrolments) {

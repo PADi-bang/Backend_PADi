@@ -471,9 +471,10 @@ router.post('/master-data/kelas', async (req, res) => {
     const { namaKelasAkhiran, sekolahId } = req.body;
     try {
         const suffix = namaKelasAkhiran.trim().toUpperCase();
+        const safeSuffix = suffix.replace(/\\/g, '\\\\');
         const tingkats = await prisma.masterTingkat.findMany({ orderBy: { id: 'asc' } });
         const existing = await prisma.masterKelas.findFirst({
-            where: { namaKelas: { equals: suffix, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
+            where: { namaKelas: { equals: safeSuffix, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) return res.redirect('/master-data?error=Nama kelas sudah ada');
         for (const t of tingkats) {
@@ -486,9 +487,15 @@ router.post('/master-data/kelas', async (req, res) => {
 });
 
 router.post('/master-data/kelas/delete-group/:group', async (req, res) => {
-    const suffix = decodeURIComponent(req.params.group);
     try {
-        const classes = await prisma.masterKelas.findMany({ where: { namaKelas: { equals: suffix, mode: 'insensitive' } } });
+        const suffix = decodeURIComponent(req.params.group);
+        const safeSuffix = suffix.replace(/\\/g, '\\\\');
+        const classes = await prisma.masterKelas.findMany({ 
+            where: { 
+                namaKelas: { equals: safeSuffix, mode: 'insensitive' },
+                sekolahId: req.session.sekolahId
+            } 
+        });
         const classIds = classes.map(c => c.id);
         const enrolments = await prisma.enrolmentKelas.findMany({ where: { kelasId: { in: classIds } } });
         for (const e of enrolments) {
@@ -496,17 +503,24 @@ router.post('/master-data/kelas/delete-group/:group', async (req, res) => {
             await prisma.enrolmentGuru.deleteMany({ where: { enrolmentKelasId: e.id } });
         }
         await prisma.enrolmentKelas.deleteMany({ where: { kelasId: { in: classIds } } });
+        
+        // Remove relationships from JadwalAbsensi manually if needed to prevent foreign key errors, 
+        // but Prisma implicit m-n (B) handles it. Just delete masterKelas.
         await prisma.masterKelas.deleteMany({ where: { id: { in: classIds } } });
         res.redirect('/master-data?success=Kelas berhasil dihapus');
-    } catch (err) { res.redirect('/master-data?error=Gagal menghapus kelas'); }
+    } catch (err) { 
+        console.error("Error deleting class:", err);
+        res.redirect('/master-data?error=Gagal menghapus kelas'); 
+    }
 });
 
 router.post('/master-data/angkatan', async (req, res) => {
     const { nomorAngkatan, sekolahId } = req.body;
     try {
         const formattedAngkatan = `Angkatan ke-${nomorAngkatan}`;
+        const safeAngkatan = formattedAngkatan.replace(/\\/g, '\\\\');
         const existing = await prisma.masterAngkatan.findFirst({
-            where: { nomorAngkatan: { equals: formattedAngkatan, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
+            where: { nomorAngkatan: { equals: safeAngkatan, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) return res.redirect('/master-data?error=Angkatan sudah ada');
         const activeCount = await prisma.masterAngkatan.count({ where: { isActive: true, sekolahId: req.session.sekolahId } });
@@ -519,8 +533,11 @@ router.post('/master-data/angkatan', async (req, res) => {
 
 router.post('/master-data/angkatan/delete/:id', async (req, res) => {
     try {
-        await prisma.siswa.updateMany({ where: { angkatanId: parseInt(req.params.id) }, data: { angkatanId: null } });
-        await prisma.masterAngkatan.delete({ where: { id: parseInt(req.params.id) } });
+        const id = parseInt(req.params.id);
+        const angkatan = await prisma.masterAngkatan.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
+        if (!angkatan) return res.redirect('/master-data?error=Unauthorized');
+        await prisma.siswa.updateMany({ where: { angkatanId: id }, data: { angkatanId: null } });
+        await prisma.masterAngkatan.delete({ where: { id } });
         res.redirect('/master-data?success=Angkatan berhasil dihapus');
     } catch (err) { res.redirect('/master-data?error=Gagal menghapus angkatan'); }
 });
@@ -528,8 +545,9 @@ router.post('/master-data/angkatan/delete/:id', async (req, res) => {
 router.post('/master-data/tahun-akademik', async (req, res) => {
     const { tahunAjaran, isActive, sekolahId } = req.body;
     try {
+        const safeTahunAjaran = tahunAjaran.replace(/\\/g, '\\\\');
         const existing = await prisma.masterTahunAkademik.findFirst({
-            where: { tahunAjaran: { equals: tahunAjaran, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
+            where: { tahunAjaran: { equals: safeTahunAjaran, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) return res.redirect('/master-data?error=Tahun akademik sudah ada');
         const semesterAktif = await getSemesterAktif();
@@ -547,7 +565,7 @@ router.post('/master-data/tahun-akademik', async (req, res) => {
 router.post('/master-data/tahun-akademik/activate/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
-        const ta = await prisma.masterTahunAkademik.findUnique({ where: { id } });
+        const ta = await prisma.masterTahunAkademik.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
         if (ta && !ta.isActive) {
             const oldTa = await prisma.masterTahunAkademik.findFirst({ where: { sekolahId: ta.sekolahId, isActive: true } });
             await prisma.masterTahunAkademik.updateMany({ where: { sekolahId: ta.sekolahId }, data: { isActive: false } });
@@ -611,6 +629,8 @@ router.post('/master-data/tahun-akademik/activate/:id', async (req, res) => {
 router.post('/master-data/tahun-akademik/delete/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
+        const ta = await prisma.masterTahunAkademik.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
+        if (!ta) return res.redirect('/master-data?error=Unauthorized');
         const enrolments = await prisma.enrolmentKelas.findMany({ where: { tahunAkademikId: id } });
         for (const e of enrolments) {
             await prisma.enrolmentSiswa.deleteMany({ where: { enrolmentKelasId: e.id } });
