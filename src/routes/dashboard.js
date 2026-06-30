@@ -270,8 +270,9 @@ router.get('/:userId', verifyToken, async (req, res) => {
     }
 
     const hariIni = new Date();
-    const awalBulan = new Date(hariIni.getFullYear(), hariIni.getMonth(), 1);
-    const akhirBulan = new Date(hariIni.getFullYear(), hariIni.getMonth() + 1, 0);
+    // Gunakan Date.UTC agar batasan bulan mencakup tanggal yang tersimpan sebagai UTC Midnight oleh Prisma
+    const awalBulan = new Date(Date.UTC(hariIni.getFullYear(), hariIni.getMonth(), 1));
+    const akhirBulan = new Date(Date.UTC(hariIni.getFullYear(), hariIni.getMonth() + 1, 0, 23, 59, 59, 999));
 
     const absensiBulanIni = await prisma.absensi.findMany({
       where: {
