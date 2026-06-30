@@ -187,7 +187,54 @@ router.get('/pending', verifyToken, async (req, res) => {
 });
 
 // ==========================================
-// 3. GURU MENYETUJUI / MENOLAK IZIN
+// 3. GURU MELIHAT DAFTAR IZIN YANG SUDAH DIPROSES (RIWAYAT)
+// GET /api/perizinan/riwayat
+// ==========================================
+router.get('/riwayat', verifyToken, async (req, res) => {
+    try {
+        let izinRiwayat = [];
+
+        // Jika yang login adalah Guru, ambil izin HANYA dari siswa di kelas yang dia ajar
+        if (req.user.role === 'Guru') {
+            const guru = await prisma.guru.findUnique({ where: { userId: req.user.id } });
+            if (guru) {
+                const kelasAjar = await prisma.enrolmentGuru.findMany({
+                    where: { guruId: guru.id, isActive: true },
+                    select: { enrolmentKelasId: true }
+                });
+                const kelasIds = kelasAjar.map(k => k.enrolmentKelasId);
+
+                const siswaDiKelas = await prisma.enrolmentSiswa.findMany({
+                    where: { enrolmentKelasId: { in: kelasIds }, isActive: true },
+                    select: { siswaId: true }
+                });
+                const siswaIds = siswaDiKelas.map(s => s.siswaId);
+
+                izinRiwayat = await prisma.perizinan.findMany({
+                    where: { status: { in: ['Disetujui', 'Ditolak'] }, siswaId: { in: siswaIds } },
+                    include: { siswa: true },
+                    orderBy: { createdAt: 'desc' },
+                    take: 50 // Batasi agar tidak terlalu berat
+                });
+            }
+        } else {
+            izinRiwayat = await prisma.perizinan.findMany({
+                where: { status: { in: ['Disetujui', 'Ditolak'] } },
+                include: { siswa: true },
+                orderBy: { createdAt: 'desc' },
+                take: 100
+            });
+        }
+
+        res.status(200).json({ status: 'success', data: izinRiwayat });
+    } catch (err) {
+        console.error("Error fetching riwayat izin:", err);
+        res.status(500).json({ status: 'error', message: 'Gagal mengambil data riwayat' });
+    }
+});
+
+// ==========================================
+// 4. GURU MENYETUJUI / MENOLAK IZIN
 // PUT /api/perizinan/:id/status
 // ==========================================
 router.put('/:id/status', async (req, res) => {
