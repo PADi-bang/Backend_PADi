@@ -68,13 +68,349 @@ router.use((req, res, next) => {
 // 1. DASHBOARD
 router.get('/dashboard', async (req, res) => {
     try {
-        const totalSiswa = await prisma.siswa.count({ where: { sekolahId: req.session.sekolahId } });
-        const totalGuru = await prisma.guru.count({ where: { sekolahId: req.session.sekolahId } });
-        const totalAdmin = await prisma.admin.count({ where: { sekolahId: req.session.sekolahId } });
+        const sekolahId = req.session.sekolahId || 1;
+        const totalSiswa = await prisma.siswa.count({ where: { sekolahId } });
+        const totalGuru = await prisma.guru.count({ where: { sekolahId } });
+        const totalAdmin = await prisma.admin.count({ where: { sekolahId } });
+
+        // === LOGIKA DINAMIS: TARIK STATISTIK ===
+        const nowWIBString = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+        const nowWIB = new Date(nowWIBString);
+        const year = nowWIB.getFullYear();
+        const month = nowWIB.getMonth();
+        const day = nowWIB.getDate();
+        
+        const startOfDay = new Date(Date.UTC(year, month, day));
+
+        // 1. Cari tanggal target (hari ini, atau fallback ke tanggal absensi terakhir yang ada datanya)
+        let targetDate = startOfDay;
+        const todayCount = await prisma.absensi.count({
+            where: { 
+                siswa: { sekolahId },
+                tanggal: { gte: startOfDay } 
+            }
+        });
+
+        if (todayCount === 0) {
+            const latestPresentRecord = await prisma.absensi.findFirst({
+                where: { 
+                    siswa: { sekolahId },
+                    status: { in: ['Hadir', 'Telat'] } 
+                },
+                orderBy: { tanggal: 'desc' }
+            });
+            if (latestPresentRecord) {
+                const d = new Date(latestPresentRecord.tanggal);
+                targetDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+            }
+        }
+
+        const startOfTargetDay = targetDate;
+        const endOfTargetDay = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+        // Hitung absensi pada targetDate
+        const hadirCount = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: startOfTargetDay, lte: endOfTargetDay }, status: 'Hadir' } });
+        const telatCount = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: startOfTargetDay, lte: endOfTargetDay }, status: 'Telat' } });
+        const izinSakitCount = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: startOfTargetDay, lte: endOfTargetDay }, status: { in: ['Izin', 'Sakit'] } } });
+        const alphaCount = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: startOfTargetDay, lte: endOfTargetDay }, status: 'Alpha' } });
+
+        const totalAbsensi = hadirCount + telatCount + izinSakitCount + alphaCount;
+        let statusChart = [70, 15, 10, 5]; // Default fallback jika benar-benar kosong
+        if (totalAbsensi > 0) {
+            const hadirPercent = Math.round((hadirCount / totalAbsensi) * 100);
+            const telatPercent = Math.round((telatCount / totalAbsensi) * 100);
+            const izinPercent = Math.round((izinSakitCount / totalAbsensi) * 100);
+            const alphaPercent = Math.max(0, 100 - hadirPercent - telatPercent - izinPercent);
+            statusChart = [hadirPercent, telatPercent, izinPercent, alphaPercent];
+        }
+
+        // Ambil semester dari tahun akademik aktif, default ke berdasarkan bulan (Ganjil: Jul-Dec, Genap: Jan-Jun)
+        const activeTahunAkademik = await prisma.masterTahunAkademik.findFirst({
+            where: { sekolahId, isActive: true }
+        });
+        const activeSemester = activeTahunAkademik ? activeTahunAkademik.semester : (month >= 6 ? 'Ganjil' : 'Genap');
+
+        // Mengambil rentang bulan dari Pengaturan secara dinamis
+        let configTglGanjil = "07-15"; 
+        let configTglGenap = "01-10";
+        try {
+            const config = await prisma.pengaturan.findMany();
+            config.forEach(c => {
+                if(c.kunci === 'tanggal_mulai_ganjil') configTglGanjil = c.nilai;
+                if(c.kunci === 'tanggal_mulai_genap') configTglGenap = c.nilai;
+            });
+        } catch(e) {}
+
+        const [bulanGanjil] = configTglGanjil.split('-').map(Number);
+        const [bulanGenap] = configTglGenap.split('-').map(Number);
+
+        const ganjilMonths = [];
+        const genapMonths = [];
+        if (bulanGanjil < bulanGenap) {
+            for (let m = 1; m <= 12; m++) {
+                if (m >= bulanGanjil && m < bulanGenap) ganjilMonths.push(m);
+                else genapMonths.push(m);
+            }
+        } else {
+            for (let m = 1; m <= 12; m++) {
+                if (m >= bulanGenap && m < bulanGanjil) genapMonths.push(m);
+                else ganjilMonths.push(m);
+            }
+        }
+
+        const allowedMonths = activeSemester === 'Ganjil' ? ganjilMonths : genapMonths;
+
+        // Determine filter type from query parameters
+        const filter = req.query.filter || 'pekan'; // 'pekan', 'bulan', 'semester'
+        let inputBulan = req.query.bulan ? parseInt(req.query.bulan) : (month + 1); // 1-indexed (1-12)
+        if (!allowedMonths.includes(inputBulan)) {
+            // Default to the first month of the active semester
+            inputBulan = allowedMonths[0];
+        }
+        const inputTahun = req.query.tahun ? parseInt(req.query.tahun) : year;
+
+        let attendanceChartLabels = [];
+        const hadirSeries = [];
+        const telatSeries = [];
+        const izinSakitSeries = [];
+        const alphaSeries = [];
+
+        if (filter === 'pekan') {
+            // 2. Grafik Mingguan (Weekly Attendance) - Exclude Saturdays and Sundays
+            let weekAnchor = startOfDay;
+            const dayOfWeekVal = startOfDay.getDay();
+            const diffToMonday = dayOfWeekVal === 0 ? -6 : 1 - dayOfWeekVal;
+            const startOfWeek = new Date(startOfDay);
+            startOfWeek.setDate(startOfWeek.getDate() + diffToMonday);
+
+            const weekCount = await prisma.absensi.count({
+                where: { 
+                    siswa: { sekolahId },
+                    tanggal: { gte: startOfWeek } 
+                }
+            });
+
+            if (weekCount === 0) {
+                const latestPresentRecord = await prisma.absensi.findFirst({
+                    where: { 
+                        siswa: { sekolahId },
+                        status: { in: ['Hadir', 'Telat'] } 
+                    },
+                    orderBy: { tanggal: 'desc' }
+                });
+                if (latestPresentRecord) {
+                    const d = new Date(latestPresentRecord.tanggal);
+                    weekAnchor = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+                }
+            }
+
+            const anchorDayOfWeek = weekAnchor.getDay();
+            const anchorDiffToMonday = anchorDayOfWeek === 0 ? -6 : 1 - anchorDayOfWeek;
+            const anchorStartOfWeek = new Date(weekAnchor);
+            anchorStartOfWeek.setDate(anchorStartOfWeek.getDate() + anchorDiffToMonday);
+
+            const dayNames = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+            for (let d = 0; d < 5; d++) { // Loop 5 days: Monday to Friday
+                const dayStart = new Date(anchorStartOfWeek);
+                dayStart.setDate(dayStart.getDate() + d);
+                const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+                const countHadir = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: dayStart, lte: dayEnd }, status: 'Hadir' } });
+                const countTelat = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: dayStart, lte: dayEnd }, status: 'Telat' } });
+                const countIzinSakit = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: dayStart, lte: dayEnd }, status: { in: ['Izin', 'Sakit'] } } });
+                const countAlpha = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: dayStart, lte: dayEnd }, status: 'Alpha' } });
+
+                hadirSeries.push(countHadir);
+                telatSeries.push(countTelat);
+                izinSakitSeries.push(countIzinSakit);
+                alphaSeries.push(countAlpha);
+                attendanceChartLabels.push(dayNames[d]);
+            }
+        } else if (filter === 'bulan') {
+            const targetMonthIndex = inputBulan - 1; // 0-indexed for JS Date
+            const targetYear = inputTahun;
+
+            const startOfMonth = new Date(Date.UTC(targetYear, targetMonthIndex, 1));
+            const endOfMonth = new Date(Date.UTC(targetYear, targetMonthIndex + 1, 0)); // last day of month
+
+            // Generate all weekdays (Monday to Friday) in this month
+            let currentDay = new Date(startOfMonth);
+            while (currentDay <= endOfMonth) {
+                const dayOfWeekVal = currentDay.getDay();
+                if (dayOfWeekVal !== 0 && dayOfWeekVal !== 6) { // Skip Sunday (0) and Saturday (6)
+                    const dayStart = new Date(currentDay);
+                    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+                    const countHadir = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: dayStart, lte: dayEnd }, status: 'Hadir' } });
+                    const countTelat = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: dayStart, lte: dayEnd }, status: 'Telat' } });
+                    const countIzinSakit = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: dayStart, lte: dayEnd }, status: { in: ['Izin', 'Sakit'] } } });
+                    const countAlpha = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: dayStart, lte: dayEnd }, status: 'Alpha' } });
+
+                    hadirSeries.push(countHadir);
+                    telatSeries.push(countTelat);
+                    izinSakitSeries.push(countIzinSakit);
+                    alphaSeries.push(countAlpha);
+
+                    // Label format: "01 Jun"
+                    const formattedDate = dayStart.toLocaleDateString("id-ID", { day: '2-digit', month: 'short' });
+                    attendanceChartLabels.push(formattedDate);
+                }
+                currentDay.setDate(currentDay.getDate() + 1);
+            }
+        } else if (filter === 'semester') {
+            const monthsInSemester = allowedMonths;
+            const shortMonthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const labelsSemester = monthsInSemester.map(m => shortMonthNames[m - 1]);
+
+            for (let idx = 0; idx < monthsInSemester.length; idx++) {
+                const mVal = monthsInSemester[idx];
+                const startOfMonth = new Date(Date.UTC(inputTahun, mVal - 1, 1));
+                const endOfMonth = new Date(Date.UTC(inputTahun, mVal, 0));
+
+                const countHadir = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: startOfMonth, lte: endOfMonth }, status: 'Hadir' } });
+                const countTelat = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: startOfMonth, lte: endOfMonth }, status: 'Telat' } });
+                const countIzinSakit = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: startOfMonth, lte: endOfMonth }, status: { in: ['Izin', 'Sakit'] } } });
+                const countAlpha = await prisma.absensi.count({ where: { siswa: { sekolahId }, tanggal: { gte: startOfMonth, lte: endOfMonth }, status: 'Alpha' } });
+
+                hadirSeries.push(countHadir);
+                telatSeries.push(countTelat);
+                izinSakitSeries.push(countIzinSakit);
+                alphaSeries.push(countAlpha);
+                attendanceChartLabels.push(labelsSemester[idx]);
+            }
+        }
+
+        // 3. Persentase Keterlambatan per Tingkat
+        const allLateAbsens = await prisma.absensi.findMany({
+            where: { 
+                siswa: { sekolahId },
+                status: 'Telat' 
+            },
+            include: {
+                siswa: {
+                    include: {
+                        enrolmentSiswa: {
+                            where: { isActive: true },
+                            include: {
+                                enrolmentKelas: {
+                                    include: {
+                                        masterKelas: {
+                                            include: { tingkat: true }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        let lateX = 0;
+        let lateXI = 0;
+        let lateXII = 0;
+
+        allLateAbsens.forEach(a => {
+            if (a.siswa && a.siswa.enrolmentSiswa && a.siswa.enrolmentSiswa.length > 0) {
+                const activeEnrol = a.siswa.enrolmentSiswa[0];
+                if (activeEnrol.enrolmentKelas && activeEnrol.enrolmentKelas.masterKelas && activeEnrol.enrolmentKelas.masterKelas.tingkat) {
+                    const tingkatName = activeEnrol.enrolmentKelas.masterKelas.tingkat.namaTingkat;
+                    if (tingkatName === 'X') lateX++;
+                    else if (tingkatName === 'XI') lateXI++;
+                    else if (tingkatName === 'XII') lateXII++;
+                }
+            }
+        });
+
+        const totalLate = lateX + lateXI + lateXII;
+        let latePercentX = 0;
+        let latePercentXI = 0;
+        let latePercentXII = 0;
+
+        if (totalLate > 0) {
+            latePercentX = Math.round((lateX / totalLate) * 100);
+            latePercentXI = Math.round((lateXI / totalLate) * 100);
+            latePercentXII = Math.max(0, 100 - latePercentX - latePercentXI);
+        }
+
+        // Tarik siswa yang Alpha atau Telat hari ini
+        const absensiBermasalah = await prisma.absensi.findMany({
+            where: {
+                siswa: { sekolahId },
+                tanggal: { gte: startOfDay },
+                status: { in: ['Alpha', 'Telat'] }
+            },
+            include: { siswa: true },
+            take: 2, 
+            orderBy: { id: 'desc' }
+        });
+
+        // Tarik siswa yang sedang Izin/Sakit hari ini
+        const perizinanHariIni = await prisma.perizinan.findMany({
+            where: {
+                siswa: { sekolahId },
+                tanggalMulai: { lte: new Date() },
+                tanggalSelesai: { gte: startOfDay },
+                status: 'Disetujui'
+            },
+            include: { siswa: true },
+            take: 1, 
+            orderBy: { id: 'desc' }
+        });
+
+        let siswaPerluPerhatian = [];
+
+        absensiBermasalah.forEach(a => {
+            if (a.siswa) {
+                siswaPerluPerhatian.push({
+                    nama: a.siswa.namaLengkap,
+                    inisial: a.siswa.namaLengkap.substring(0, 2).toUpperCase(),
+                    statusText: a.status === 'Alpha' ? 'Alpha (Tanpa Keterangan)' : 'Terlambat Masuk',
+                    theme: a.status === 'Alpha' ? 'red' : 'orange'
+                });
+            }
+        });
+
+        perizinanHariIni.forEach(p => {
+            if (p.siswa) {
+                siswaPerluPerhatian.push({
+                    nama: p.siswa.namaLengkap,
+                    inisial: p.siswa.namaLengkap.substring(0, 2).toUpperCase(),
+                    statusText: p.jenisIzin === 'Sakit' ? 'Izin (Sakit)' : 'Izin (Kepentingan)',
+                    theme: 'blue'
+                });
+            }
+        });
+
         res.render('admin/dashboard', { 
-            stats: { totalSiswa, totalGuru, totalAdmin, attendanceWeekly: [0,0,0,0,0,0,0], statusChart: [0,0,0] }
+            stats: { 
+                totalSiswa, 
+                totalGuru, 
+                totalAdmin, 
+                chartSeries: {
+                    hadir: hadirSeries,
+                    telat: telatSeries,
+                    izinSakit: izinSakitSeries,
+                    alpha: alphaSeries
+                },
+                attendanceChartLabels,
+                filter,
+                selectedBulan: inputBulan,
+                selectedTahun: inputTahun,
+                activeSemester,
+                allowedMonths,
+                currentBulan: month + 1,
+                statusChart,
+                siswaPerluPerhatian,
+                lateDistribution: {
+                    X: latePercentX,
+                    XI: latePercentXI,
+                    XII: latePercentXII
+                }
+            }
         });
     } catch (err) {
+        console.error("Dashboard error:", err);
         res.render('admin/error', { message: err.message });
     }
 });

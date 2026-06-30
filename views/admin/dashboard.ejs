@@ -130,10 +130,68 @@
         <div class="grid grid-cols-1 lg:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <div class="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between">
                 <div>
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex flex-col gap-4 mb-6 pb-4 border-b border-gray-100">
                         <div>
                             <h3 class="font-bold text-gray-800 text-lg">Statistik Kehadiran Siswa</h3>
-                            <p class="text-xs text-gray-400 font-semibold mt-1">Estimasi Sistem Dinamis</p>
+                            <p class="text-xs text-gray-400 font-bold mt-1">
+                                Semester <%= (locals.stats && locals.stats.activeSemester) ? locals.stats.activeSemester : 'Ganjil' %> (Tahun Ajaran Berjalan)
+                            </p>
+                        </div>
+                        
+                        <div class="flex flex-wrap items-center gap-3 justify-start">
+                            <!-- Segmented Controls (Pekan, Bulan, Semester) -->
+                            <div class="inline-flex bg-gray-105 p-1.5 rounded-2xl border border-gray-200/50 shadow-inner">
+                                <a href="/dashboard?filter=pekan" 
+                                   class="px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 <%= (locals.stats && locals.stats.filter === 'pekan') ? 'bg-white text-primary shadow-sm scale-102 font-extrabold' : 'text-gray-500 hover:text-gray-800' %>">
+                                    Pekan
+                                </a>
+                                <a href="/dashboard?filter=bulan" 
+                                   class="px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 <%= (locals.stats && locals.stats.filter === 'bulan') ? 'bg-white text-primary shadow-sm scale-102 font-extrabold' : 'text-gray-500 hover:text-gray-800' %>">
+                                    Bulan
+                                </a>
+                                <a href="/dashboard?filter=semester" 
+                                   class="px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 <%= (locals.stats && locals.stats.filter === 'semester') ? 'bg-white text-primary shadow-sm scale-102 font-extrabold' : 'text-gray-500 hover:text-gray-800' %>">
+                                    Semester
+                                </a>
+                            </div>
+
+                            <!-- Dropdown & Reset Bulan Selector (hanya jika filter === 'bulan') -->
+                            <% if (locals.stats && locals.stats.filter === 'bulan') { %>
+                                <div class="flex items-center gap-2">
+                                    <!-- Dropdown Pilihan Bulan -->
+                                    <form method="GET" action="/dashboard" class="inline-flex items-center">
+                                        <input type="hidden" name="filter" value="bulan">
+                                        <div class="relative">
+                                            <select name="bulan" onchange="this.form.submit()" 
+                                                    class="appearance-none bg-white border border-gray-200 text-gray-700 text-xs font-bold rounded-xl pl-4 pr-10 py-2.5 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition cursor-pointer">
+                                                <% 
+                                                const namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                                                const allowed = (locals.stats && locals.stats.allowedMonths) ? locals.stats.allowedMonths : [1,2,3,4,5,6,7,8,9,10,11,12];
+                                                allowed.forEach(function(m) {
+                                                %>
+                                                    <option value="<%= m %>" <%= locals.stats.selectedBulan === m ? 'selected' : '' %>>
+                                                        <%= namaBulan[m-1] %>
+                                                    </option>
+                                                <% }); %>
+                                            </select>
+                                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </form>
+
+                                    <!-- Tombol Pilihan Bulan Ini -->
+                                    <a href="/dashboard?filter=bulan&bulan=<%= locals.stats.currentBulan %>" 
+                                       class="px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 border border-gray-200/60 text-gray-700 hover:text-gray-900 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5 active:scale-95">
+                                        <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        </svg>
+                                        Bulan Ini
+                                    </a>
+                                </div>
+                            <% } %>
                         </div>
                     </div>
                     <div id="attendanceChart" class="w-full h-64"></div>
@@ -224,35 +282,53 @@
 
     </main>
 
-    <script type="application/json" id="weekly-data">
-        <%- locals.stats ? JSON.stringify(locals.stats.attendanceWeekly) : '[0,0,0,0,0,0,0]' %>
+    <script type="application/json" id="chart-series">
+        <%- locals.stats && locals.stats.chartSeries ? JSON.stringify(locals.stats.chartSeries) : '{"hadir":[],"telat":[],"izinSakit":[],"alpha":[]}' %>
     </script>
     <script type="application/json" id="status-data">
         <%- locals.stats ? JSON.stringify(locals.stats.statusChart) : '[0,0,0]' %>
     </script>
+    <script type="application/json" id="chart-labels">
+        <%- locals.stats && locals.stats.attendanceChartLabels ? JSON.stringify(locals.stats.attendanceChartLabels) : '[]' %>
+    </script>
 
     <script>
-        const weeklyData = JSON.parse(document.getElementById('weekly-data').textContent);
+        const seriesData = JSON.parse(document.getElementById('chart-series').textContent);
         const statusData = JSON.parse(document.getElementById('status-data').textContent);
+        const chartLabels = JSON.parse(document.getElementById('chart-labels').textContent);
 
         // 1. Konfigurasi Grafik Gelombang
         const attendanceOptions = {
-            series: [{
-                name: 'Tepat Waktu',
-                data: weeklyData 
-            }],
+            series: [
+                {
+                    name: 'Hadir',
+                    data: seriesData.hadir || []
+                },
+                {
+                    name: 'Telat',
+                    data: seriesData.telat || []
+                },
+                {
+                    name: 'Izin/Sakit',
+                    data: seriesData.izinSakit || []
+                },
+                {
+                    name: 'Alpha',
+                    data: seriesData.alpha || []
+                }
+            ],
             chart: { height: 280, type: 'area', fontFamily: 'inherit', toolbar: { show: false } },
-            colors: ['#006D5B'],
+            colors: ['#006D5B', '#3B82F6', '#F59E0B', '#EF4444'], // Hijau, Biru, Kuning, Merah
             fill: {
                 type: 'gradient',
-                gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 90, 100] }
+                gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.01, stops: [0, 90, 100] }
             },
             dataLabels: { enabled: false },
-            stroke: { curve: 'smooth', width: 3 },
+            stroke: { curve: 'smooth', width: 2.5 },
             xaxis: {
-                categories: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'],
+                categories: chartLabels,
                 axisBorder: { show: false }, axisTicks: { show: false },
-                labels: { style: { colors: '#94a3b8', fontSize: '12px', fontWeight: 600 } }
+                labels: { style: { colors: '#94a3b8', fontSize: '11px', fontWeight: 600 } }
             },
             yaxis: { 
                 labels: { 
@@ -269,9 +345,9 @@
         // 2. Konfigurasi Grafik Donut
         const statusOptions = {
             series: statusData, 
-            labels: ['Hadir', 'Izin/Sakit', 'Alpha'],
+            labels: ['Hadir', 'Telat', 'Izin/Sakit', 'Alpha'],
             chart: { type: 'donut', height: 220, fontFamily: 'inherit' },
-            colors: ['#006D5B', '#F59E0B', '#EF4444'],
+            colors: ['#006D5B', '#3B82F6', '#F59E0B', '#EF4444'],
             plotOptions: {
                 pie: {
                     donut: {
