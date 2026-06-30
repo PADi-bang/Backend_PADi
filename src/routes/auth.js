@@ -111,6 +111,7 @@ router.post('/login', async (req, res) => {
       id: user.id,
       role: user.role.namaRole,
       username: user.username,
+      email: user.email,
       // Siapkan object kosong untuk data tambahan
       kelas: "Informasi Kelas",
       geofence: null,
