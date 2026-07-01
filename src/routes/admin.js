@@ -16,7 +16,7 @@ const upload = multer({ dest: os.tmpdir() });
 router.get('/siswa', async (req, res) => {
     const { search } = req.query;
     try {
-        let whereClause = { roleId: 3 }; 
+        let whereClause = { roleId: 3, siswa: { sekolahId: req.session.sekolahId } }; 
         if (search) {
             whereClause = {
                 ...whereClause,
@@ -65,7 +65,7 @@ router.post('/siswa', async (req, res) => {
         const newUser = await prisma.user.create({
             data: {
                 username, email, password: hashedPassword, roleId: 3,
-                siswa: { create: { namaLengkap, nis, sekolahId: parseInt(sekolahId) || 1, angkatanId: parseInt(angkatanId) || null } }
+                siswa: { create: { namaLengkap, nis, sekolahId: req.session.sekolahId, angkatanId: parseInt(angkatanId) || null } }
             }
         });
         res.status(201).json({ status: 'success', data: newUser });
@@ -122,7 +122,7 @@ router.delete('/siswa/:id', async (req, res) => {
 router.get('/guru', async (req, res) => {
     const { search } = req.query;
     try {
-        let whereClause = { roleId: 2 }; 
+        let whereClause = { roleId: 2, guru: { sekolahId: req.session.sekolahId } }; 
         if (search) {
             whereClause = {
                 ...whereClause,
@@ -166,7 +166,7 @@ router.post('/guru', async (req, res) => {
         const newUser = await prisma.user.create({
             data: {
                 username, email, password: hashedPassword, roleId: 2,
-                guru: { create: { namaLengkap, nip, sekolahId: parseInt(sekolahId) || 1 } }
+                guru: { create: { namaLengkap, nip, sekolahId: req.session.sekolahId } }
             }
         });
         res.status(201).json({ status: 'success', data: newUser });
@@ -357,7 +357,7 @@ router.post('/siswa/upload', upload.single('file'), async (req, res) => {
                     if (!angkatan) {
                         // Auto-create angkatan if it doesn't exist
                         angkatan = await prisma.masterAngkatan.create({
-                            data: { nomorAngkatan: angkatanInput, sekolahId: 1, isActive: true }
+                            data: { nomorAngkatan: angkatanInput, sekolahId: req.session.sekolahId, isActive: true }
                         });
                     }
                     angkatanId = angkatan.id;
@@ -421,7 +421,7 @@ router.post('/siswa/upload', upload.single('file'), async (req, res) => {
                                 create: {
                                     namaLengkap: nama,
                                     nis,
-                                    sekolahId: 1,
+                                    sekolahId: req.session.sekolahId,
                                     angkatanId
                                 }
                             }

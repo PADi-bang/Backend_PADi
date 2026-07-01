@@ -111,6 +111,7 @@ router.post('/login', async (req, res) => {
       id: user.id,
       role: user.role.namaRole,
       username: user.username,
+      email: user.email,
       // Siapkan object kosong untuk data tambahan
       kelas: "Informasi Kelas",
       geofence: null,
@@ -141,7 +142,13 @@ router.post('/login', async (req, res) => {
             // Format GeoJSON adalah [ [ [lon, lat], [lon, lat] ] ]. Kita ambil array koordinatnya.
             // Flutter mengharapkan array pasangan koordinat: [[lon, lat], [lon, lat], ...]
             responseData.geofence = {
+              isActive: siswa.sekolah.isGeofenceActive,
               polygon: geoJson.coordinates[0] 
+            };
+          } else {
+            responseData.geofence = {
+              isActive: siswa.sekolah.isGeofenceActive,
+              polygon: null
             };
           }
         }
@@ -196,4 +203,31 @@ router.get('/users', verifyToken, async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Terjadi kesalahan server' });
   }
 });
+
+// PUT /api/auth/fcm-token
+// Menyimpan atau memperbarui FCM Token milik pengguna
+router.put('/fcm-token', verifyToken, async (req, res) => {
+  try {
+    const { userId, fcmToken } = req.body;
+
+    if (!userId || !fcmToken) {
+      return res.status(400).json({ status: 'error', message: 'userId dan fcmToken wajib diisi' });
+    }
+
+    // Update FCM token di database
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(userId) },
+      data: { fcmToken: fcmToken }
+    });
+
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'FCM Token berhasil diperbarui' 
+    });
+  } catch (err) {
+    console.error('Error update FCM Token:', err);
+    res.status(500).json({ status: 'error', message: 'Gagal memperbarui FCM Token' });
+  }
+});
+
 module.exports = router;

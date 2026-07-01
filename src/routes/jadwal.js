@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 router.get('/', async (req, res) => {
     try {
         const jadwalListRaw = await prisma.jadwalAbsensi.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: {
                 kelas: { include: { tingkat: true } } // Ambil relasi kelas & tingkat
             },
@@ -17,6 +18,7 @@ router.get('/', async (req, res) => {
 
         // Ambil semua kelas untuk panel 'Kelas Yang Belum Terjadwal'
         const kelasListRaw = await prisma.masterKelas.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: {
                 jadwalAbsensi: true,
                 tingkat: true
@@ -82,7 +84,7 @@ router.post('/', async (req, res) => {
 
         const newJadwal = await prisma.jadwalAbsensi.create({
             data: {
-                sekolahId: 1, // Default sementara
+                sekolahId: req.session.sekolahId, // Default sementara
                 namaJadwal,
                 hari: currentHari,
                 tanggal: processedTanggal,
@@ -107,6 +109,8 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        const existingJadwal = await prisma.jadwalAbsensi.findFirst({ where: { id: parseInt(id), sekolahId: req.session.sekolahId } });
+        if (!existingJadwal) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
         const { namaJadwal, tipeJadwal, tanggal, jamMasukStart, jamMasukFinish, jamPulang } = req.body;
 
         const parseTime = (timeStr) => {
@@ -158,6 +162,8 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        const existingJadwal = await prisma.jadwalAbsensi.findFirst({ where: { id: parseInt(id), sekolahId: req.session.sekolahId } });
+        if (!existingJadwal) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
 
         // Hapus data absensi terkait terlebih dahulu untuk menghindari error foreign key constraint
         await prisma.absensi.deleteMany({
@@ -182,6 +188,8 @@ router.delete('/:id', async (req, res) => {
 router.put('/:id/assign', async (req, res) => {
     try {
         const { id } = req.params;
+        const existingJadwal = await prisma.jadwalAbsensi.findFirst({ where: { id: parseInt(id), sekolahId: req.session.sekolahId } });
+        if (!existingJadwal) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
         const { kelasId } = req.body;
 
         const updateJadwal = await prisma.jadwalAbsensi.update({
@@ -210,6 +218,8 @@ router.put('/:id/assign', async (req, res) => {
 router.put('/:id/unassign', async (req, res) => {
     try {
         const { id } = req.params;
+        const existingJadwal = await prisma.jadwalAbsensi.findFirst({ where: { id: parseInt(id), sekolahId: req.session.sekolahId } });
+        if (!existingJadwal) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
         const { kelasId } = req.body;
 
         const updateJadwal = await prisma.jadwalAbsensi.update({
@@ -238,6 +248,8 @@ router.put('/:id/unassign', async (req, res) => {
 router.put('/:id/toggle', async (req, res) => {
     try {
         const { id } = req.params;
+        const existingJadwal = await prisma.jadwalAbsensi.findFirst({ where: { id: parseInt(id), sekolahId: req.session.sekolahId } });
+        if (!existingJadwal) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
         const { isLibur } = req.body;
 
         const updatedJadwal = await prisma.jadwalAbsensi.update({
@@ -259,9 +271,12 @@ router.put('/:id/toggle', async (req, res) => {
 router.put('/:id/activate', async (req, res) => {
     try {
         const { id } = req.params;
+        const existingJadwal = await prisma.jadwalAbsensi.findFirst({ where: { id: parseInt(id), sekolahId: req.session.sekolahId } });
+        if (!existingJadwal) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
 
         // Pertama, nonaktifkan semua jadwal
         await prisma.jadwalAbsensi.updateMany({
+            where: { sekolahId: req.session.sekolahId },
             data: { isActive: false }
         });
 
@@ -285,6 +300,8 @@ router.put('/:id/activate', async (req, res) => {
 router.put('/:id/deactivate', async (req, res) => {
     try {
         const { id } = req.params;
+        const existingJadwal = await prisma.jadwalAbsensi.findFirst({ where: { id: parseInt(id), sekolahId: req.session.sekolahId } });
+        if (!existingJadwal) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
 
         const updatedJadwal = await prisma.jadwalAbsensi.update({
             where: { id: parseInt(id) },

@@ -132,6 +132,7 @@ model Sekolah {
   namaSekolah         String                @map("nama_sekolah")
   alamat              String
   areaSekolah         Unsupported("geography(Polygon, 4326)")? @map("area_sekolah")
+  isGeofenceActive    Boolean               @default(true) @map("is_active_geofence")
   admins              Admin[]
   gurus               Guru[]
   siswas              Siswa[]

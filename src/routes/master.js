@@ -96,6 +96,7 @@ router.post('/pengaturan', async (req, res) => {
 router.get('/kelas', async (req, res) => {
     try {
         const kelasRaw = await prisma.masterKelas.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { sekolah: true, tingkat: true },
             orderBy: [{ tingkatId: 'asc' }, { namaKelas: 'asc' }]
         });
@@ -125,8 +126,9 @@ router.post('/kelas', async (req, res) => {
         }
 
         // Cek duplikasi
+        const safeSuffix = suffix.replace(/\\/g, '\\\\');
         const existing = await prisma.masterKelas.findFirst({
-            where: { namaKelas: { equals: suffix, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
+            where: { namaKelas: { equals: safeSuffix, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) {
             return res.status(400).json({ status: 'error', message: 'Nama kelas sudah ada' });
@@ -138,7 +140,7 @@ router.post('/kelas', async (req, res) => {
                 data: { 
                     namaKelas: suffix, 
                     tingkatId: t.id,
-                    sekolahId: parseInt(sekolahId) || 1 
+                    sekolahId: req.session.sekolahId 
                 }
             });
             createdClasses.push(newKelas);
@@ -151,7 +153,7 @@ router.post('/kelas', async (req, res) => {
             if (existingEnrolmentInSameTingkat) {
                 await prisma.enrolmentKelas.create({
                     data: {
-                        sekolahId: parseInt(sekolahId) || 1,
+                        sekolahId: req.session.sekolahId,
                         kelasId: newKelas.id,
                         tahunAkademikId: existingEnrolmentInSameTingkat.tahunAkademikId,
                         keterangan: ''
@@ -189,9 +191,10 @@ router.delete('/kelas/:id', async (req, res) => {
 router.delete('/kelas/group/:suffix', async (req, res) => {
     const suffix = req.params.suffix;
     try {
+        const safeSuffix = suffix.replace(/\\/g, '\\\\');
         // Find all classes matching the suffix
         const classes = await prisma.masterKelas.findMany({
-            where: { namaKelas: { equals: suffix, mode: 'insensitive' } }
+            where: { namaKelas: { equals: safeSuffix, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
 
         if (classes.length === 0) {
@@ -225,6 +228,7 @@ router.delete('/kelas/group/:suffix', async (req, res) => {
 router.get('/angkatan', async (req, res) => {
     try {
         const angkatan = await prisma.masterAngkatan.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { sekolah: true },
             orderBy: { nomorAngkatan: 'asc' }
         });
@@ -238,21 +242,23 @@ router.post('/angkatan', async (req, res) => {
     const { nomorAngkatan, sekolahId } = req.body;
     try {
         // Cek duplikasi
+        const formattedAngkatan = String(nomorAngkatan).trim();
+        const safeAngkatan = formattedAngkatan.replace(/\\/g, '\\\\');
         const existing = await prisma.masterAngkatan.findFirst({
-            where: { nomorAngkatan: { equals: nomorAngkatan, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
+            where: { nomorAngkatan: { equals: safeAngkatan, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) {
             return res.status(400).json({ status: 'error', message: 'Angkatan sudah ada' });
         }
 
         // Cek jumlah yang aktif
-        const activeCount = await prisma.masterAngkatan.count({ where: { isActive: true, sekolahId: parseInt(sekolahId) || 1 } });
+        const activeCount = await prisma.masterAngkatan.count({ where: { isActive: true, sekolahId: req.session.sekolahId } });
         const newIsActive = activeCount < 4;
 
         const newAngkatan = await prisma.masterAngkatan.create({
             data: { 
                 nomorAngkatan, 
-                sekolahId: parseInt(sekolahId) || 1,
+                sekolahId: req.session.sekolahId,
                 isActive: newIsActive
             }
         });
@@ -287,7 +293,9 @@ router.put('/angkatan/:id/toggle-active', async (req, res) => {
 router.delete('/angkatan/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
-        // Set angkatanId to null for any Siswa using this Angkatan
+        const angkatan = await prisma.masterAngkatan.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
+        if (!angkatan) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
+
         await prisma.siswa.updateMany({
             where: { angkatanId: id },
             data: { angkatanId: null }
@@ -307,6 +315,7 @@ router.delete('/angkatan/:id', async (req, res) => {
 router.get('/tahun-akademik', async (req, res) => {
     try {
         const tahunAkademik = await prisma.masterTahunAkademik.findMany({
+            where: { sekolahId: req.session.sekolahId },
             include: { sekolah: true },
             orderBy: { tahunAjaran: 'asc' }
         });
@@ -319,9 +328,9 @@ router.get('/tahun-akademik', async (req, res) => {
 router.post('/tahun-akademik', async (req, res) => {
     const { tahunAjaran, isActive, sekolahId } = req.body;
     try {
-        // Cek duplikasi
+        const safeTahunAjaran = tahunAjaran.replace(/\\/g, '\\\\');
         const existing = await prisma.masterTahunAkademik.findFirst({
-            where: { tahunAjaran: { equals: tahunAjaran, mode: 'insensitive' }, sekolahId: parseInt(sekolahId) || 1 }
+            where: { tahunAjaran: { equals: safeTahunAjaran, mode: 'insensitive' }, sekolahId: req.session.sekolahId }
         });
         if (existing) {
             return res.status(400).json({ status: 'error', message: 'Tahun akademik sudah ada' });
@@ -334,7 +343,7 @@ router.post('/tahun-akademik', async (req, res) => {
         if (newIsActive) {
             // Nonaktifkan semua TA lainnya
             await prisma.masterTahunAkademik.updateMany({
-                where: { sekolahId: parseInt(sekolahId) || 1 },
+                where: { sekolahId: req.session.sekolahId },
                 data: { isActive: false }
             });
         }
@@ -344,7 +353,7 @@ router.post('/tahun-akademik', async (req, res) => {
                 tahunAjaran, 
                 semester: semesterAktif, 
                 isActive: newIsActive,
-                sekolahId: parseInt(sekolahId) || 1 
+                sekolahId: req.session.sekolahId 
             }
         });
         res.status(201).json({ status: 'success', data: newTa });
@@ -353,11 +362,11 @@ router.post('/tahun-akademik', async (req, res) => {
     }
 });
 
-router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
+router.put('/tahun-akademik/:id/activate', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
-        const ta = await prisma.masterTahunAkademik.findUnique({ where: { id } });
-        if(ta) {
+        const ta = await prisma.masterTahunAkademik.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
+        if (ta && !ta.isActive) {
             const newIsActive = !ta.isActive;
             let prevActiveTa = null;
 
@@ -528,6 +537,9 @@ router.put('/tahun-akademik/:id/toggle-active', async (req, res) => {
 router.delete('/tahun-akademik/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     try {
+        const ta = await prisma.masterTahunAkademik.findFirst({ where: { id, sekolahId: req.session.sekolahId } });
+        if (!ta) return res.status(403).json({ status: 'error', message: 'Unauthorized' });
+
         // Find enrolments related to this TA to cascade delete
         const enrolments = await prisma.enrolmentKelas.findMany({ where: { tahunAkademikId: id } });
         for (const e of enrolments) {

@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const prisma = require('../db'); 
+const prisma = require('../db');
 const { Prisma } = require('@prisma/client');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const { sendPushNotification } = require('../utils/firebase');
+
 
 
 /**
@@ -13,7 +15,7 @@ const fs = require('fs').promises;
 function l2Normalize(vector) {
   const sum = vector.reduce((acc, val) => acc + val * val, 0);
   const magnitude = Math.sqrt(sum);
-  if (magnitude === 0) return vector; 
+  if (magnitude === 0) return vector;
   return vector.map(val => val / magnitude);
 }
 
@@ -35,40 +37,87 @@ function calculateEuclideanDistance(vec1, vec2) {
 
 // [BARU] Konfigurasi Multer untuk menangani unggahan foto absensi
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        // [DIUBAH] Tentukan subfolder berdasarkan endpoint yang diakses
-        const subfolder = req.path.includes('/masuk') ? 'foto_masuk' : 'foto_pulang';
-        const dir = path.join('uploads', 'foto_absen', subfolder);
+  destination: function (req, file, cb) {
+    // [DIUBAH] Tentukan subfolder berdasarkan endpoint yang diakses
+    const subfolder = req.path.includes('/masuk') ? 'foto_masuk' : 'foto_pulang';
+    const dir = path.join('uploads', 'foto_absen', subfolder);
 
-        fs.mkdir(dir, { recursive: true })
-            .then(() => cb(null, dir))
-            .catch(err => cb(err));
-    },
-    filename: function (req, file, cb) {
-        // Nama file sementara, akan diganti di dalam logika route
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
+    fs.mkdir(dir, { recursive: true })
+      .then(() => cb(null, dir))
+      .catch(err => cb(err));
+  },
+  filename: function (req, file, cb) {
+    // Nama file sementara, akan diganti di dalam logika route
+    cb(null, Date.now() + path.extname(file.originalname));
+  }
 });
 
-const upload = multer({ 
-    storage: storage,
-    // [REKOMENDASI] Batasi ukuran file maksimal 2MB
-    limits: { fileSize: 2 * 1024 * 1024 } 
+const upload = multer({
+  storage: storage,
+  // [REKOMENDASI] Batasi ukuran file maksimal 10MB
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
+
+const { spawn } = require('child_process');
+
+/**
+ * Menjalankan skrip Python untuk mendeteksi wajah dan mengekstrak embedding 192d.
+ */
+function extractFaceWithPython(imagePath) {
+  return new Promise((resolve, reject) => {
+    const pythonExecutable = process.env.PYTHON_PATH || 'python';
+    const pythonProcess = spawn(pythonExecutable, [
+      path.join(__dirname, '../utils/extract_face.py'),
+      imagePath
+    ]);
+
+    pythonProcess.on('error', (err) => {
+      reject(new Error("Gagal menjalankan Python: " + err.message));
+    });
+
+    let outputData = '';
+    let errorData = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      outputData += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorData += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      try {
+        const jsonStr = outputData.split('\n').map(l => l.trim()).find(l => l.startsWith('{') && l.endsWith('}'));
+        if (!jsonStr) {
+          return reject(new Error("Gagal mengekstrak wajah: " + (errorData || outputData)));
+        }
+        const result = JSON.parse(jsonStr);
+        if (result.status === 'success') {
+          resolve(result.embedding);
+        } else {
+          reject(new Error(result.message || 'Wajah tidak terdeteksi'));
+        }
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
 
 // POST /api/absensi/masuk
 router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
   // [DIUBAH] 'fotoMasuk' sekarang ada di req.file, sisanya di req.body
-  const { userId, faceEmbedding: faceEmbeddingJson, latitude, longitude } = req.body; 
+  const { userId, latitude, longitude } = req.body;
 
-  if (!userId || !faceEmbeddingJson || latitude === undefined || longitude === undefined || !req.file) {
-    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, faceEmbedding, latitude, longitude, dan fotoMasuk wajib diisi.' });
+  if (!userId || latitude === undefined || longitude === undefined || !req.file) {
+    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, latitude, longitude, dan fotoMasuk wajib diisi.' });
   }
 
   try {
-    const siswa = await prisma.siswa.findUnique({ 
+    const siswa = await prisma.siswa.findUnique({
       where: { userId: parseInt(userId) },
-      include: { sekolah: true } 
+      include: { sekolah: true, user: true }
     });
 
     if (!siswa) return res.status(404).json({ status: 'error', message: 'Profil siswa tidak ditemukan.' });
@@ -76,40 +125,51 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     if (!siswa.sekolah) return res.status(404).json({ status: 'error', message: 'Data sekolah tidak ditemukan.' });
 
     const storedEmbedding = JSON.parse(siswa.faceModel);
-    const faceEmbedding = JSON.parse(faceEmbeddingJson); // [DIUBAH] Parse JSON string dari form-data
-    const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
-    const FACE_RECOGNITION_THRESHOLD = 0.8; 
+    
+    // [BARU] Ekstrak wajah menggunakan skrip Python di server
+    let faceEmbeddingInput;
+    try {
+      faceEmbeddingInput = await extractFaceWithPython(req.file.path);
+    } catch (err) {
+      if (req.file) await fs.unlink(req.file.path).catch(e => console.error(e));
+      return res.status(400).json({ status: 'error', message: err.message });
+    }
+
+    let distance = calculateEuclideanDistance(faceEmbeddingInput, storedEmbedding);
+    const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD) || 0.95;
 
     if (distance > FACE_RECOGNITION_THRESHOLD) {
       // [PENTING] Hapus file sampah karena absensi dibatalkan
       if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (wajah):", err));
-      return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
+      return res.status(400).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
     }
 
-    const locationCheckResult = await prisma.$queryRaw`
-        SELECT ST_Covers(
-            area_sekolah, 
-            ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
-        ) as "isWithinArea"
-        FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
-    `;
+    if (siswa.sekolah.isGeofenceActive) {
+      const locationCheckResult = await prisma.$queryRaw`
+          SELECT ST_Covers(
+              area_sekolah, 
+              ST_SetSRID(ST_MakePoint(${parseFloat(longitude)}, ${parseFloat(latitude)}), 4326)::geography
+          ) as "isWithinArea"
+          FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
+      `;
 
-    if (!locationCheckResult || !Array.isArray(locationCheckResult) || locationCheckResult.length === 0) {
+      if (!locationCheckResult || !Array.isArray(locationCheckResult) || locationCheckResult.length === 0) {
         // [PENTING] Hapus file sampah karena validasi gagal di server
         if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (validasi lokasi):", err));
         return res.status(500).json({ status: 'error', message: 'Gagal memvalidasi lokasi sekolah.' });
-    }
-    if (!locationCheckResult[0]?.isWithinArea) {
+      }
+      if (!locationCheckResult[0]?.isWithinArea) {
         // [PENTING] Hapus file sampah karena absensi dibatalkan
         if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (luar area):", err));
-        return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+        return res.status(400).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+      }
     }
 
     // Mengunci waktu saat ini ke WIB murni
-    const now = new Date(); 
+    const now = new Date();
     const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const nowWIB = new Date(utcTime + (3600000 * 7)); 
-    
+    const nowWIB = new Date(utcTime + (3600000 * 7));
+
     // Membangun batas deteksi hari ini murni berdasarkan kalender WIB
     const year = nowWIB.getFullYear();
     const month = String(nowWIB.getMonth() + 1).padStart(2, '0');
@@ -121,40 +181,40 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
 
     // Tahap 4: Validasi Jadwal Absensi
     const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][nowWIB.getDay()];
-    
+
     // Ambil HANYA jadwal yang saat ini sedang DIAKTIFKAN oleh admin
     const jadwal = await prisma.jadwalAbsensi.findFirst({
-        where: {
-            sekolahId: siswa.sekolahId,
-            isActive: true
-        }
+      where: {
+        sekolahId: siswa.sekolahId,
+        isActive: true
+      }
     });
 
     if (!jadwal) return res.status(404).json({ status: 'error', message: `Belum ada jadwal yang diaktifkan oleh Admin.` });
-    if (jadwal.isLibur) return res.status(403).json({ status: 'error', message: `Hari ini ditetapkan sebagai hari libur oleh Admin.` });
+    if (jadwal.isLibur) return res.status(400).json({ status: 'error', message: `Hari ini ditetapkan sebagai hari libur oleh Admin.` });
 
     let berlakuHariIni = false;
-    
+
     if (jadwal.tanggal && jadwal.tanggal.length > 0) {
-        // Jika ini jadwal khusus, cek apakah tanggal hari ini ada di dalam array tanggal yang diset
-        const isTodayInTanggal = jadwal.tanggal.some(d => {
-            const dateObj = new Date(d);
-            return dateObj.getFullYear() === year && 
-                   String(dateObj.getMonth() + 1).padStart(2, '0') === month && 
-                   String(dateObj.getDate()).padStart(2, '0') === day;
-        });
-        if (isTodayInTanggal) berlakuHariIni = true;
+      // Jika ini jadwal khusus, cek apakah tanggal hari ini ada di dalam array tanggal yang diset
+      const isTodayInTanggal = jadwal.tanggal.some(d => {
+        const dateObj = new Date(d);
+        return dateObj.getFullYear() === year &&
+          String(dateObj.getMonth() + 1).padStart(2, '0') === month &&
+          String(dateObj.getDate()).padStart(2, '0') === day;
+      });
+      if (isTodayInTanggal) berlakuHariIni = true;
     } else {
-        // Jika ini jadwal reguler, cek apakah hari ini (Senin, Selasa, dst) ada di dalam pengaturan jadwal
-        if (jadwal.hari && jadwal.hari.includes(dayOfWeek)) {
-            berlakuHariIni = true;
-        }
+      // Jika ini jadwal reguler, cek apakah hari ini (Senin, Selasa, dst) ada di dalam pengaturan jadwal
+      if (jadwal.hari && jadwal.hari.includes(dayOfWeek)) {
+        berlakuHariIni = true;
+      }
     }
 
     if (!berlakuHariIni) {
-        // [PENTING] Hapus file sampah
-        if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah:", err));
-        return res.status(404).json({ status: 'error', message: `Jadwal aktif saat ini ('${jadwal.namaJadwal}') tidak berlaku untuk hari ini.` });
+      // [PENTING] Hapus file sampah
+      if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah:", err));
+      return res.status(404).json({ status: 'error', message: `Jadwal aktif saat ini ('${jadwal.namaJadwal}') tidak berlaku untuk hari ini.` });
     }
 
     // [PERBAIKAN] Gunakan Raw Query untuk mengecek absensi yang sudah ada.
@@ -170,9 +230,9 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     `);
 
     if (existingAbsensi && existingAbsensi.length > 0) {
-        // [PENTING] Hapus file sampah karena absensi dibatalkan
-        if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (duplikat):", err));
-        return res.status(409).json({ status: 'error', message: 'Anda sudah melakukan absensi masuk hari ini.' });
+      // [PENTING] Hapus file sampah karena absensi dibatalkan
+      if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (duplikat):", err));
+      return res.status(409).json({ status: 'error', message: 'Anda sudah melakukan absensi masuk hari ini.' });
     }
 
     // Perhitungan waktu absen siswa saat ini (WIB)
@@ -184,7 +244,7 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
     // Karena jadwal.jamMasukFinish bertipe TIME, Prisma membacanya sebagai objek Date tahun 1970 UTC.
     // Kita WAJIB mengekstraknya menggunakan getUTCHours() agar nilainya tetap murni "07:15"
     const jamMasukFinishDb = new Date(jadwal.jamMasukFinish);
-    const jamBatas = jamMasukFinishDb.getUTCHours(); 
+    const jamBatas = jamMasukFinishDb.getUTCHours();
     const menitBatas = jamMasukFinishDb.getUTCMinutes();
     const totalMenitBatas = (jamBatas * 60) + menitBatas;
 
@@ -201,17 +261,17 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
         keterangan = `Telat ${menitTelat} menit`;
       }
     }
-    
+
     // Merakit teks jam dan tanggal secara manual agar PostgreSQL menerima data statis murni tanpa Timezone Bleed
     const strJam = String(jamSekarang).padStart(2, '0');
     const strMenit = String(menitSekarang).padStart(2, '0');
     const strDetik = String(detikSekarang).padStart(2, '0');
-    const waktuWIBString = `${strJam}:${strMenit}:${strDetik}`; 
+    const waktuWIBString = `${strJam}:${strMenit}:${strDetik}`;
 
     // [BARU] Proses rename file dan siapkan path untuk disimpan ke DB
     const baseName = `${siswa.namaLengkap}_Masuk_${tanggalWIBString}`
-        .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9_-]/g, '');
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_-]/g, '');
     const uniqueSuffix = Date.now();
     const fileExtension = path.extname(req.file.originalname);
     const finalFileName = `${baseName}_${uniqueSuffix}${fileExtension}`;
@@ -226,13 +286,31 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
 
     const result = await prisma.$queryRaw(Prisma.sql`
       INSERT INTO absensi (id_siswa, id_jadwal, tanggal, jam_masuk, status, keterangan, koordinat_masuk, foto_masuk)
-      VALUES (${siswa.id}, ${jadwal.id}, ${tanggalWIBString}::date, ${waktuWIBString}::time, ${status}::"AbsensiStatus", ${keterangan}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326), ${fotoMasukPath})
+      VALUES (${siswa.id}, ${jadwal.id}, ${tanggalWIBString}::date, ${waktuWIBString}::time, ${status}::"AbsensiStatus", ${keterangan}, ST_SetSRID(ST_MakePoint(${parseFloat(longitude)}, ${parseFloat(latitude)}), 4326), ${fotoMasukPath})
       RETURNING
         id_absensi, id_siswa, id_jadwal, tanggal, jam_masuk, jam_pulang, status, keterangan, foto_masuk, foto_pulang,
         ST_AsGeoJSON(koordinat_masuk) as koordinat_masuk;
     `);
 
     const absensiBaru = result[0];
+    await prisma.notifikasi.create({
+      data: {
+        userId: parseInt(userId),
+        judul: 'Absensi Berhasil',
+        tipe: 'Sistem',
+        isiPesan: `Anda berhasil melakukan absensi masuk. Status: ${status}`,
+      }
+    });
+
+    if (siswa.user && siswa.user.fcmToken) {
+      await sendPushNotification(
+        siswa.user.fcmToken,
+        'Absensi Berhasil',
+        `Anda berhasil melakukan absensi masuk. Status: ${status}`,
+        { type: 'absensi' }
+      ).catch(e => console.error('Gagal kirim notif absen masuk:', e));
+    }
+
     res.status(201).json({ status: 'success', message: `Absensi berhasil! Status: ${status}`, data: absensiBaru });
 
   } catch (err) {
@@ -245,50 +323,62 @@ router.post('/masuk', upload.single('fotoMasuk'), async (req, res) => {
 
 // POST /api/absensi/pulang
 router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
-  const { userId, faceEmbedding: faceEmbeddingJson, latitude, longitude } = req.body;
+  const { userId, latitude, longitude } = req.body;
 
-  if (!userId || !faceEmbeddingJson || latitude === undefined || longitude === undefined || !req.file) {
-    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, faceEmbedding, latitude, longitude, dan fotoPulang wajib diisi.' });
+  if (!userId || latitude === undefined || longitude === undefined || !req.file) {
+    return res.status(400).json({ status: 'error', message: 'Data tidak lengkap: userId, latitude, longitude, dan fotoPulang wajib diisi.' });
   }
 
   try {
-    const siswa = await prisma.siswa.findUnique({ 
+    const siswa = await prisma.siswa.findUnique({
       where: { userId: parseInt(userId) },
-      include: { sekolah: true } 
+      include: { sekolah: true, user: true }
     });
 
     if (!siswa) return res.status(404).json({ status: 'error', message: 'Profil siswa tidak ditemukan.' });
     if (!siswa.faceModel) return res.status(400).json({ status: 'error', message: 'Belum mendaftarkan wajah.' });
 
     const storedEmbedding = JSON.parse(siswa.faceModel);
-    const faceEmbedding = JSON.parse(faceEmbeddingJson); // [DIUBAH] Parse JSON string dari form-data
-    const distance = calculateEuclideanDistance(faceEmbedding, storedEmbedding);
-    if (distance > 0.8) {
-      if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (wajah):", err));
-      return res.status(401).json({ status: 'error', message: `Wajah tidak dikenali.` });
+    
+    // [BARU] Ekstrak wajah menggunakan skrip Python di server
+    let faceEmbeddingInput;
+    try {
+      faceEmbeddingInput = await extractFaceWithPython(req.file.path);
+    } catch (err) {
+      if (req.file) await fs.unlink(req.file.path).catch(e => console.error(e));
+      return res.status(400).json({ status: 'error', message: err.message });
     }
 
-    const locationCheckResult = await prisma.$queryRaw`
-        SELECT ST_Covers(
-            area_sekolah, 
-            ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
-        ) as "isWithinArea"
-        FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
-    `;
+    let distance = calculateEuclideanDistance(faceEmbeddingInput, storedEmbedding);
+    const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD) || 0.95;
+    if (distance > FACE_RECOGNITION_THRESHOLD) {
+      if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (wajah):", err));
+      return res.status(400).json({ status: 'error', message: `Wajah tidak dikenali. (Jarak: ${distance.toFixed(2)})` });
+    }
 
-    if (!locationCheckResult?.[0]?.isWithinArea) {
+    if (siswa.sekolah.isGeofenceActive) {
+      const locationCheckResult = await prisma.$queryRaw`
+          SELECT ST_Covers(
+              area_sekolah, 
+              ST_SetSRID(ST_MakePoint(${parseFloat(longitude)}, ${parseFloat(latitude)}), 4326)::geography
+          ) as "isWithinArea"
+          FROM sekolah WHERE id_sekolah = ${siswa.sekolahId}
+      `;
+
+      if (!locationCheckResult?.[0]?.isWithinArea) {
         if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (luar area):", err));
-        return res.status(403).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+        return res.status(400).json({ status: 'error', message: 'Anda berada di luar area sekolah.' });
+      }
     }
 
     const now = new Date();
     const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
     const nowWIB = new Date(utcTime + (3600000 * 7));
-    
+
     const year = nowWIB.getFullYear();
     const month = String(nowWIB.getMonth() + 1).padStart(2, '0');
     const day = String(nowWIB.getDate()).padStart(2, '0');
-    
+
     // [PERBAIKAN FINAL] Kita merakit string tanggal dan mencarinya menggunakan Raw SQL murni
     const tanggalWIBString = `${year}-${month}-${day}`;
 
@@ -303,8 +393,8 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
     `);
 
     if (!cariAbsensi || cariAbsensi.length === 0) {
-        if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (absen masuk tidak ada):", err));
-        return res.status(404).json({ status: 'error', message: 'Anda belum melakukan absensi masuk hari ini atau sudah pernah absen pulang.' });
+      if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (absen masuk tidak ada):", err));
+      return res.status(404).json({ status: 'error', message: 'Anda belum melakukan absensi masuk hari ini atau sudah pernah absen pulang.' });
     }
 
     const absensiHariIni = cariAbsensi[0];
@@ -312,34 +402,34 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
     // --- [BARU] VALIDASI BELUM WAKTUNYA PULANG ---
     // 1. Ambil data jadwal absensi yang digunakan saat absen masuk pagi tadi
     const jadwal = await prisma.jadwalAbsensi.findUnique({
-        where: { id: absensiHariIni.id_jadwal } // Kita ambil ID jadwal dari data absen masuk
+      where: { id: absensiHariIni.id_jadwal } // Kita ambil ID jadwal dari data absen masuk
     });
 
     if (jadwal && jadwal.jamPulang) {
-        // Konversi jam pulang dari database ke total menit (Sama seperti logika absen masuk)
-        const jamPulangDb = new Date(jadwal.jamPulang);
-        const batasJamPulang = jamPulangDb.getUTCHours(); 
-        const batasMenitPulang = jamPulangDb.getUTCMinutes();
-        const totalMenitBatasPulang = (batasJamPulang * 60) + batasMenitPulang;
+      // Konversi jam pulang dari database ke total menit (Sama seperti logika absen masuk)
+      const jamPulangDb = new Date(jadwal.jamPulang);
+      const batasJamPulang = jamPulangDb.getUTCHours();
+      const batasMenitPulang = jamPulangDb.getUTCMinutes();
+      const totalMenitBatasPulang = (batasJamPulang * 60) + batasMenitPulang;
 
-        // Hitung waktu sekarang
-        const jamSekarang = nowWIB.getHours();
-        const menitSekarang = nowWIB.getMinutes();
-        const totalMenitSekarang = (jamSekarang * 60) + menitSekarang;
+      // Hitung waktu sekarang
+      const jamSekarang = nowWIB.getHours();
+      const menitSekarang = nowWIB.getMinutes();
+      const totalMenitSekarang = (jamSekarang * 60) + menitSekarang;
 
-        // Jika waktu sekarang masih kurang dari batas jam pulang, tolak!
-        if (totalMenitSekarang < totalMenitBatasPulang) {
-            // Opsional: Buat pesan yang rapi (misal: "Belum waktunya pulang. Jadwal pulang: 15:00")
-            const strBatasJam = String(batasJamPulang).padStart(2, '0');
-            const strBatasMenit = String(batasMenitPulang).padStart(2, '0');
-            
-            // [PENTING] Hapus file sampah karena absensi dibatalkan
-            if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (belum waktu pulang):", err));
-            return res.status(403).json({ 
-                status: 'error', 
-                message: `Belum waktunya pulang. Jadwal kepulangan hari ini adalah pukul ${strBatasJam}:${strBatasMenit} WIB.` 
-            });
-        }
+      // Jika waktu sekarang masih kurang dari batas jam pulang, tolak!
+      if (totalMenitSekarang < totalMenitBatasPulang) {
+        // Opsional: Buat pesan yang rapi (misal: "Belum waktunya pulang. Jadwal pulang: 15:00")
+        const strBatasJam = String(batasJamPulang).padStart(2, '0');
+        const strBatasMenit = String(batasMenitPulang).padStart(2, '0');
+
+        // [PENTING] Hapus file sampah karena absensi dibatalkan
+        if (req.file) await fs.unlink(req.file.path).catch(err => console.error("Gagal hapus file sampah (belum waktu pulang):", err));
+        return res.status(400).json({
+          status: 'error',
+          message: `Belum waktunya pulang. Jadwal kepulangan hari ini adalah pukul ${strBatasJam}:${strBatasMenit} WIB.`
+        });
+      }
     }
     // --- [SELESAI VALIDASI WAKTU PULANG] ---
 
@@ -347,7 +437,7 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
     const jamSekarang = nowWIB.getHours();
     const menitSekarang = nowWIB.getMinutes();
     const detikSekarang = nowWIB.getSeconds();
-    
+
     const strJam = String(jamSekarang).padStart(2, '0');
     const strMenit = String(menitSekarang).padStart(2, '0');
     const strDetik = String(detikSekarang).padStart(2, '0');
@@ -355,8 +445,8 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
 
     // [BARU] Proses rename file dan siapkan path untuk disimpan ke DB
     const baseName = `${siswa.namaLengkap}_Pulang_${tanggalWIBString}`
-        .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9_-]/g, '');
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_-]/g, '');
     const uniqueSuffix = Date.now();
     const fileExtension = path.extname(req.file.originalname);
     const finalFileName = `${baseName}_${uniqueSuffix}${fileExtension}`;
@@ -374,12 +464,30 @@ router.post('/pulang', upload.single('fotoPulang'), async (req, res) => {
       SET 
         jam_pulang = ${waktuWIBString}::time,
         foto_pulang = ${fotoPulangPath},
-        koordinat_pulang = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
+        koordinat_pulang = ST_SetSRID(ST_MakePoint(${parseFloat(longitude)}, ${parseFloat(latitude)}), 4326)
       WHERE id_absensi = ${absensiHariIni.id}
       RETURNING
         id_absensi, jam_pulang, foto_pulang,
         ST_AsGeoJSON(koordinat_pulang) as koordinat_pulang;
     `);
+
+    await prisma.notifikasi.create({
+      data: {
+        userId: parseInt(userId),
+        judul: 'Absensi Pulang Berhasil',
+        tipe: 'Sistem',
+        isiPesan: 'Anda berhasil melakukan absensi pulang.',
+      }
+    });
+
+    if (siswa.user && siswa.user.fcmToken) {
+      await sendPushNotification(
+        siswa.user.fcmToken,
+        'Absensi Pulang Berhasil',
+        'Anda berhasil melakukan absensi pulang.',
+        { type: 'absensi_pulang' }
+      ).catch(e => console.error('Gagal kirim notif absen pulang:', e));
+    }
 
     res.status(200).json({ status: 'success', message: 'Absensi pulang berhasil!', data: result[0] });
 

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] },
+                    colors: {
+                        primary: '#0F172A',
+                        secondary: '#1E293B',
+                        accent: '#38BDF8'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0f172a; color: #f8fafc; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .tab-btn.active { border-bottom: 2px solid #38BDF8; color: #38BDF8; }
+        .tab-btn { color: #94a3b8; }
+    </style>
+</head>
+<body class="font-sans min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <header class="glass sticky top-0 z-40 px-8 py-4 flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-accent rounded-xl flex items-center justify-center text-primary font-black text-xl">D</div>
+            <span class="text-xl font-bold tracking-tight text-white">DevAdmin</span>
+        </div>
+        <div class="flex items-center gap-6">
+            <span class="text-sm text-slate-400 font-medium">Hello, Developer</span>
+            <a href="/devadmin/logout" class="bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition">Logout</a>
+        </div>
+    </header>
+
+    <main class="flex-1 p-8 max-w-7xl mx-auto w-full">
+        
+        <% if (typeof success !== 'undefined' && success) { %>
+            <div class="bg-green-500/10 border border-green-500/50 text-green-400 p-4 rounded-xl mb-8 flex items-center gap-3">
+                <span>✅</span> <%= success %>
+            </div>
+        <% } %>
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-xl mb-8 flex items-center gap-3">
+                <span>⚠️</span> <%= error %>
+            </div>
+        <% } %>
+
+        <div class="flex gap-8 border-b border-slate-700 mb-8">
+            <button onclick="switchTab('sekolah')" id="btn-sekolah" class="tab-btn active pb-4 px-2 font-bold text-lg transition">🏢 Manajemen Sekolah</button>
+            <button onclick="switchTab('admin')" id="btn-admin" class="tab-btn pb-4 px-2 font-bold text-lg transition">👨‍💻 Manajemen Admin</button>
+        </div>
+
+        <!-- TAB: SEKOLAH -->
+        <div id="tab-sekolah" class="block">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Daftar Sekolah</h2>
+                <button onclick="toggleModal('modalTambahSekolah')" class="bg-accent text-primary px-5 py-2 rounded-xl text-sm font-bold hover:bg-sky-400 transition shadow-lg shadow-accent/20">+ Tambah Sekolah</button>
+            </div>
+            
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-800/50 text-xs uppercase text-slate-400 font-bold tracking-wider">
+                        <tr>
+                            <th class="px-6 py-4">ID</th>
+                            <th class="px-6 py-4">Nama Sekolah</th>
+                            <th class="px-6 py-4">Alamat</th>
+                            <th class="px-6 py-4 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800 text-sm">
+                        <% if (sekolahs && sekolahs.length > 0) { %>
+                            <% sekolahs.forEach(s => { %>
+                                <tr class="hover:bg-slate-800/30 transition">
+                                    <td class="px-6 py-4 text-slate-400">#<%= s.id %></td>
+                                    <td class="px-6 py-4 font-bold text-white"><%= s.namaSekolah %></td>
+                                    <td class="px-6 py-4 text-slate-400"><%= s.alamat %></td>
+                                    <td class="px-6 py-4 flex justify-center gap-2">
+                                        <button onclick="editSekolah('<%= s.id %>', '<%= s.namaSekolah %>', '<%= s.alamat %>')" class="bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded text-xs font-bold hover:bg-indigo-500/40 transition">Edit</button>
+                                        <form action="/devadmin/sekolah/delete/<%= s.id %>" method="POST" class="inline" onsubmit="return confirmDel(event)">
+                                            <button class="bg-red-500/20 text-red-400 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-500/40 transition">Hapus</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">Belum ada sekolah terdaftar.</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: ADMIN -->
+        <div id="tab-admin" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Daftar Admin Sekolah</h2>
+                <button onclick="toggleModal('modalTambahAdmin')" class="bg-accent text-primary px-5 py-2 rounded-xl text-sm font-bold hover:bg-sky-400 transition shadow-lg shadow-accent/20">+ Tambah Admin</button>
+            </div>
+            
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-800/50 text-xs uppercase text-slate-400 font-bold tracking-wider">
+                        <tr>
+                            <th class="px-6 py-4">User</th>
+                            <th class="px-6 py-4">Sekolah Terhubung</th>
+                            <th class="px-6 py-4 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800 text-sm">
+                        <% if (admins && admins.length > 0) { %>
+                            <% admins.forEach(u => { %>
+                                <tr class="hover:bg-slate-800/30 transition">
+                                    <td class="px-6 py-4">
+                                        <div class="font-bold text-white mb-1"><%= u.admin ? u.admin.namaAdmin : 'N/A' %></div>
+                                        <div class="text-xs text-slate-400"><%= u.username %> • <%= u.email %></div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <% if (u.admin && u.admin.sekolah) { %>
+                                            <span class="bg-sky-500/10 text-sky-400 border border-sky-500/20 px-3 py-1 rounded-full text-xs font-bold">
+                                                <%= u.admin.sekolah.namaSekolah %>
+                                            </span>
+                                        <% } else { %>
+                                            <span class="text-red-400 italic text-xs">Belum terhubung</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="px-6 py-4 flex justify-center gap-2">
+                                        <button onclick="editAdmin('<%= u.id %>', '<%= u.admin ? u.admin.namaAdmin : '' %>', '<%= u.username %>', '<%= u.email %>', '<%= u.admin ? u.admin.sekolahId : '' %>')" class="bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded text-xs font-bold hover:bg-indigo-500/40 transition">Edit</button>
+                                        <% if (u.username !== 'admin') { %>
+                                            <form action="/devadmin/admin/delete/<%= u.id %>" method="POST" class="inline" onsubmit="return confirmDel(event)">
+                                                <button class="bg-red-500/20 text-red-400 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-500/40 transition">Hapus</button>
+                                            </form>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="3" class="px-6 py-8 text-center text-slate-500">Belum ada admin terdaftar.</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODALS -->
+
+    <!-- Modal Tambah Sekolah -->
+    <div id="modalTambahSekolah" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-secondary border border-slate-700 rounded-3xl p-8 w-full max-w-md relative">
+            <button onclick="toggleModal('modalTambahSekolah')" class="absolute top-6 right-6 text-slate-400 hover:text-white">✖</button>
+            <h2 class="text-2xl font-bold mb-6">Tambah Sekolah</h2>
+            <form action="/devadmin/sekolah" method="POST" class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Nama Sekolah</label>
+                    <input type="text" name="namaSekolah" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Alamat</label>
+                    <textarea name="alamat" required rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-accent hover:bg-sky-400 text-primary font-bold py-3.5 rounded-xl transition mt-2">Simpan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Edit Sekolah -->
+    <div id="modalEditSekolah" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-secondary border border-slate-700 rounded-3xl p-8 w-full max-w-md relative">
+            <button onclick="toggleModal('modalEditSekolah')" class="absolute top-6 right-6 text-slate-400 hover:text-white">✖</button>
+            <h2 class="text-2xl font-bold mb-6">Edit Sekolah</h2>
+            <form id="formEditSekolah" method="POST" class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Nama Sekolah</label>
+                    <input type="text" name="namaSekolah" id="editNamaSekolah" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Alamat</label>
+                    <textarea name="alamat" id="editAlamat" required rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-accent hover:bg-sky-400 text-primary font-bold py-3.5 rounded-xl transition mt-2">Update</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Tambah Admin -->
+    <div id="modalTambahAdmin" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-secondary border border-slate-700 rounded-3xl p-8 w-full max-w-md relative overflow-y-auto max-h-[90vh]">
+            <button onclick="toggleModal('modalTambahAdmin')" class="absolute top-6 right-6 text-slate-400 hover:text-white">✖</button>
+            <h2 class="text-2xl font-bold mb-6">Tambah Admin</h2>
+            <form action="/devadmin/admin" method="POST" class="space-y-4">
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs text-slate-400 uppercase font-bold">Nama Lengkap</label>
+                        <label class="flex items-center text-xs text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="syncUsernameTambah" checked class="mr-1" onchange="toggleSync('Tambah')">
+                            Samakan dgn Username
+                        </label>
+                    </div>
+                    <input type="text" name="namaAdmin" id="namaAdminTambah" readonly required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent opacity-50 cursor-not-allowed">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Username</label>
+                        <input type="text" name="username" id="usernameTambah" oninput="syncUsername('Tambah')" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Email</label>
+                        <input type="email" name="email" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Password</label>
+                    <input type="password" name="password" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Tautkan ke Sekolah</label>
+                    <select name="sekolahId" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent appearance-none">
+                        <option value="">-- Pilih Sekolah --</option>
+                        <% sekolahs.forEach(s => { %>
+                            <option value="<%= s.id %>"><%= s.namaSekolah %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-accent hover:bg-sky-400 text-primary font-bold py-3.5 rounded-xl transition mt-4">Simpan Admin</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Edit Admin -->
+    <div id="modalEditAdmin" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex justify-center items-center">
+        <div class="bg-secondary border border-slate-700 rounded-3xl p-8 w-full max-w-md relative overflow-y-auto max-h-[90vh]">
+            <button onclick="toggleModal('modalEditAdmin')" class="absolute top-6 right-6 text-slate-400 hover:text-white">✖</button>
+            <h2 class="text-2xl font-bold mb-6">Edit Admin</h2>
+            <form id="formEditAdmin" method="POST" class="space-y-4">
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs text-slate-400 uppercase font-bold">Nama Lengkap</label>
+                        <label class="flex items-center text-xs text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="syncUsernameEdit" class="mr-1" onchange="toggleSync('Edit')">
+                            Samakan dgn Username
+                        </label>
+                    </div>
+                    <input type="text" name="namaAdmin" id="namaAdminEdit" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Username</label>
+                        <input type="text" name="username" id="usernameEdit" oninput="syncUsername('Edit')" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Email</label>
+                        <input type="email" name="email" id="editEmail" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Password (Kosongkan jika tdk diubah)</label>
+                    <input type="password" name="password" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase font-bold">Tautkan ke Sekolah</label>
+                    <select name="sekolahId" id="editSekolahId" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-accent appearance-none">
+                        <% sekolahs.forEach(s => { %>
+                            <option value="<%= s.id %>"><%= s.namaSekolah %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-accent hover:bg-sky-400 text-primary font-bold py-3.5 rounded-xl transition mt-4">Update Admin</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleModal(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tab-sekolah').classList.add('hidden');
+            document.getElementById('tab-admin').classList.add('hidden');
+            document.getElementById('btn-sekolah').classList.remove('active');
+            document.getElementById('btn-admin').classList.remove('active');
+
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`btn-${tab}`).classList.add('active');
+            
+            // Save state in URL hash
+            window.location.hash = tab;
+        }
+
+        function editSekolah(id, nama, alamat) {
+            document.getElementById('formEditSekolah').action = `/devadmin/sekolah/edit/${id}`;
+            document.getElementById('editNamaSekolah').value = nama;
+            document.getElementById('editAlamat').value = alamat;
+            toggleModal('modalEditSekolah');
+        }
+
+        function editAdmin(id, nama, username, email, sekolahId) {
+            document.getElementById('formEditAdmin').action = `/devadmin/admin/edit/${id}`;
+            const namaInput = document.getElementById('namaAdminEdit');
+            const usernameInput = document.getElementById('usernameEdit');
+            const syncCheck = document.getElementById('syncUsernameEdit');
+            
+            namaInput.value = nama;
+            usernameInput.value = username;
+            document.getElementById('editEmail').value = email;
+            if(sekolahId) document.getElementById('editSekolahId').value = sekolahId;
+            
+            // Check if nama and username are the same
+            if (nama === username) {
+                syncCheck.checked = true;
+                namaInput.readOnly = true;
+                namaInput.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                syncCheck.checked = false;
+                namaInput.readOnly = false;
+                namaInput.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            
+            toggleModal('modalEditAdmin');
+        }
+
+        function toggleSync(mode) {
+            const syncCheck = document.getElementById(`syncUsername${mode}`);
+            const namaInput = document.getElementById(`namaAdmin${mode}`);
+            const usernameInput = document.getElementById(`username${mode}`);
+            
+            if (syncCheck.checked) {
+                namaInput.value = usernameInput.value;
+                namaInput.readOnly = true;
+                namaInput.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                namaInput.readOnly = false;
+                namaInput.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function syncUsername(mode) {
+            const syncCheck = document.getElementById(`syncUsername${mode}`);
+            if (syncCheck.checked) {
+                document.getElementById(`namaAdmin${mode}`).value = document.getElementById(`username${mode}`).value;
+            }
+        }
+
+        function confirmDel(e) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Apakah anda yakin?',
+                text: "Data yang dihapus tidak bisa dikembalikan!",
+                icon: 'warning',
+                background: '#1E293B',
+                color: '#fff',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#475569',
+                confirmButtonText: 'Ya, hapus!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    e.target.submit();
+                }
+            });
+        }
+
+        // Check hash on load
+        if(window.location.hash) {
+            const tab = window.location.hash.substring(1);
+            if(tab === 'sekolah' || tab === 'admin') switchTab(tab);
+        }
+    </script>
+</body>
+</html>

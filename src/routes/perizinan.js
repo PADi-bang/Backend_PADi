@@ -5,6 +5,7 @@ const multer = require('multer');
 const fs = require('fs').promises; // Gunakan 'fs' promise-based untuk async/await
 const path = require('path');
 const { sendPushNotification } = require('../utils/firebase'); // [BARU] Import util firebase
+const verifyToken = require('../middleware/auth'); // [BARU] Import middleware auth
 
 const prisma = new PrismaClient();
 
@@ -24,8 +25,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ 
     storage: storage,
-    // [REKOMENDASI] Batasi ukuran file maksimal 2MB untuk mencegah unggahan file besar
-    limits: { fileSize: 2 * 1024 * 1024 } 
+    // [REKOMENDASI] Batasi ukuran file maksimal 10MB untuk mencegah unggahan file besar
+    limits: { fileSize: 10 * 1024 * 1024 } 
 });
 
 // ==========================================
@@ -105,13 +106,23 @@ router.post('/', upload.single('fileBukti'), async (req, res) => {
 
             if (enrolment && enrolment.enrolmentKelas && enrolment.enrolmentKelas.enrolmentGuru.length > 0) {
                 const guruWali = enrolment.enrolmentKelas.enrolmentGuru[0].guru;
-                if (guruWali && guruWali.user && guruWali.user.fcmToken) {
-                    await sendPushNotification(
-                        guruWali.user.fcmToken,
-                        'Pengajuan Izin Baru',
-                        `${siswa.namaLengkap} mengajukan izin ${jenisIzin}.`,
-                        { type: 'izin', izinId: izinBaru.id.toString() }
-                    );
+                if (guruWali && guruWali.user) {
+                    await prisma.notifikasi.create({
+                        data: {
+                            userId: guruWali.user.id,
+                            judul: 'Pengajuan Izin Baru',
+                            tipe: 'Sistem',
+                            isiPesan: `${siswa.namaLengkap} mengajukan izin ${jenisIzin}.`,
+                        }
+                    });
+                    if (guruWali.user.fcmToken) {
+                        await sendPushNotification(
+                            guruWali.user.fcmToken,
+                            'Pengajuan Izin Baru',
+                            `${siswa.namaLengkap} mengajukan izin ${jenisIzin}.`,
+                            { type: 'izin', izinId: izinBaru.id.toString() }
+                        );
+                    }
                 }
             }
         } catch (errFcm) {
@@ -130,21 +141,100 @@ router.post('/', upload.single('fileBukti'), async (req, res) => {
 // 2. GURU MELIHAT DAFTAR IZIN PENDING
 // GET /api/perizinan/pending
 // ==========================================
-router.get('/pending', async (req, res) => {
+router.get('/pending', verifyToken, async (req, res) => {
     try {
-        const izinPending = await prisma.perizinan.findMany({
-            where: { status: 'Pending' },
-            include: { siswa: true },
-            orderBy: { createdAt: 'desc' }
-        });
+        let izinPending = [];
+
+        // Jika yang login adalah Guru, ambil izin HANYA dari siswa di kelas yang dia ajar
+        if (req.user.role === 'Guru') {
+            const guru = await prisma.guru.findUnique({ where: { userId: req.user.id } });
+            if (guru) {
+                // Cari kelas-kelas yang diajar oleh guru ini
+                const kelasAjar = await prisma.enrolmentGuru.findMany({
+                    where: { guruId: guru.id, isActive: true },
+                    select: { enrolmentKelasId: true }
+                });
+                const kelasIds = kelasAjar.map(k => k.enrolmentKelasId);
+
+                // Cari siswa-siswa yang ada di kelas-kelas tersebut
+                const siswaDiKelas = await prisma.enrolmentSiswa.findMany({
+                    where: { enrolmentKelasId: { in: kelasIds }, isActive: true },
+                    select: { siswaId: true }
+                });
+                const siswaIds = siswaDiKelas.map(s => s.siswaId);
+
+                // Ambil izin HANYA untuk siswa-siswa tersebut
+                izinPending = await prisma.perizinan.findMany({
+                    where: { status: 'Pending', siswaId: { in: siswaIds } },
+                    include: { siswa: true },
+                    orderBy: { createdAt: 'desc' }
+                });
+            }
+        } else {
+            // Jika admin/lainnya, ambil semua (atau sesuaikan dengan kebutuhan bisnis)
+            izinPending = await prisma.perizinan.findMany({
+                where: { status: 'Pending' },
+                include: { siswa: true },
+                orderBy: { createdAt: 'desc' }
+            });
+        }
+
         res.status(200).json({ status: 'success', data: izinPending });
     } catch (err) {
+        console.error("Error fetching pending izin:", err);
         res.status(500).json({ status: 'error', message: 'Gagal mengambil data' });
     }
 });
 
 // ==========================================
-// 3. GURU MENYETUJUI / MENOLAK IZIN
+// 3. GURU MELIHAT DAFTAR IZIN YANG SUDAH DIPROSES (RIWAYAT)
+// GET /api/perizinan/riwayat
+// ==========================================
+router.get('/riwayat', verifyToken, async (req, res) => {
+    try {
+        let izinRiwayat = [];
+
+        // Jika yang login adalah Guru, ambil izin HANYA dari siswa di kelas yang dia ajar
+        if (req.user.role === 'Guru') {
+            const guru = await prisma.guru.findUnique({ where: { userId: req.user.id } });
+            if (guru) {
+                const kelasAjar = await prisma.enrolmentGuru.findMany({
+                    where: { guruId: guru.id, isActive: true },
+                    select: { enrolmentKelasId: true }
+                });
+                const kelasIds = kelasAjar.map(k => k.enrolmentKelasId);
+
+                const siswaDiKelas = await prisma.enrolmentSiswa.findMany({
+                    where: { enrolmentKelasId: { in: kelasIds }, isActive: true },
+                    select: { siswaId: true }
+                });
+                const siswaIds = siswaDiKelas.map(s => s.siswaId);
+
+                izinRiwayat = await prisma.perizinan.findMany({
+                    where: { status: { in: ['Disetujui', 'Ditolak'] }, siswaId: { in: siswaIds } },
+                    include: { siswa: true },
+                    orderBy: { createdAt: 'desc' },
+                    take: 50 // Batasi agar tidak terlalu berat
+                });
+            }
+        } else {
+            izinRiwayat = await prisma.perizinan.findMany({
+                where: { status: { in: ['Disetujui', 'Ditolak'] } },
+                include: { siswa: true },
+                orderBy: { createdAt: 'desc' },
+                take: 100
+            });
+        }
+
+        res.status(200).json({ status: 'success', data: izinRiwayat });
+    } catch (err) {
+        console.error("Error fetching riwayat izin:", err);
+        res.status(500).json({ status: 'error', message: 'Gagal mengambil data riwayat' });
+    }
+});
+
+// ==========================================
+// 4. GURU MENYETUJUI / MENOLAK IZIN
 // PUT /api/perizinan/:id/status
 // ==========================================
 router.put('/:id/status', async (req, res) => {
@@ -178,12 +268,12 @@ router.put('/:id/status', async (req, res) => {
                     const current = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
                     const dayOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][current.getUTCDay()];
                     
-                    // Cari jadwal reguler untuk hari tersebut
+                    // Cari jadwal reguler yang AKTIF untuk hari tersebut
                     let jadwal = await prisma.jadwalAbsensi.findFirst({
                         where: {
                             sekolahId: izin.siswa.sekolahId,
                             hari: { contains: dayOfWeek },
-                            tanggal: { isEmpty: true },
+                            isActive: true,
                             isLibur: false
                         }
                     });
@@ -220,13 +310,23 @@ router.put('/:id/status', async (req, res) => {
                 include: { siswa: { include: { user: true } } }
             });
 
-            if (izinData && izinData.siswa && izinData.siswa.user && izinData.siswa.user.fcmToken) {
-                await sendPushNotification(
-                    izinData.siswa.user.fcmToken,
-                    'Status Izin Diperbarui',
-                    `Pengajuan izin Anda telah ${statusUpdate}.`,
-                    { type: 'izin_status', izinId: izinId.toString() }
-                );
+            if (izinData && izinData.siswa && izinData.siswa.user) {
+                await prisma.notifikasi.create({
+                    data: {
+                        userId: izinData.siswa.user.id,
+                        judul: 'Status Izin Diperbarui',
+                        tipe: 'Sistem',
+                        isiPesan: `Pengajuan izin Anda telah ${statusUpdate}.`,
+                    }
+                });
+                if (izinData.siswa.user.fcmToken) {
+                    await sendPushNotification(
+                        izinData.siswa.user.fcmToken,
+                        'Status Izin Diperbarui',
+                        `Pengajuan izin Anda telah ${statusUpdate}.`,
+                        { type: 'izin_status', izinId: izinId.toString() }
+                    );
+                }
             }
         } catch (errFcm) {
             console.error('Gagal mengirim FCM persetujuan izin:', errFcm.message);
