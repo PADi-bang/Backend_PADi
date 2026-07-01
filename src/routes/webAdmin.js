@@ -1059,12 +1059,21 @@ router.get('/enrolment/:id', async (req, res) => {
             enrolment.masterKelas.namaKelas = enrolment.masterKelas.tingkat ? `${enrolment.masterKelas.tingkat.namaTingkat} ${enrolment.masterKelas.namaKelas}` : enrolment.masterKelas.namaKelas;
         }
 
-        const [allSiswa, allGuru] = await Promise.all([
+        const [allSiswa, allGuru, enrolledInTa] = await Promise.all([
             prisma.siswa.findMany({ where: { sekolahId: req.session.sekolahId }, include: { masterAngkatan: true } }),
-            prisma.guru.findMany({ where: { sekolahId: req.session.sekolahId } })
+            prisma.guru.findMany({ where: { sekolahId: req.session.sekolahId } }),
+            prisma.enrolmentSiswa.findMany({
+                where: {
+                    enrolmentKelas: { tahunAkademikId: enrolment.tahunAkademikId },
+                    isActive: true
+                },
+                select: { siswaId: true }
+            })
         ]);
+        const enrolledSiswaIds = enrolledInTa.map(es => es.siswaId);
+        const availableSiswa = allSiswa.filter(s => !enrolledSiswaIds.includes(s.id));
 
-        const detail = { enrolment, allSiswa, allGuru };
+        const detail = { enrolment, allSiswa: availableSiswa, allGuru };
         res.render('admin/enrolment_detail', { detail });
     } catch (err) {
         res.render('admin/error', { message: err.message });
@@ -1107,7 +1116,10 @@ router.post('/enrolment/:id/siswa', async (req, res) => {
 
         await prisma.enrolmentSiswa.create({ data: { enrolmentKelasId, siswaId: parseInt(siswaId), isActive: true } });
         res.redirect(`/enrolment/${enrolmentKelasId}?success=Siswa berhasil ditambahkan`);
-    } catch (err) { res.redirect(`/enrolment/${enrolmentKelasId}?error=Gagal menambah siswa`); }
+    } catch (err) { 
+        console.error("ADD SISWA ERROR:", err);
+        res.redirect(`/enrolment/${enrolmentKelasId}?error=Gagal menambah siswa: ${err.message}`); 
+    }
 });
 
 router.post('/enrolment/:id/siswa/delete/:siswaId', async (req, res) => {
