@@ -69,12 +69,21 @@ router.get('/dashboard/:userId', verifyToken, async (req, res) => {
             keterangan = izinSiswa.alasan;
         }
 
+        let adjustedJamMasuk = null;
+        if (absenSiswa && absenSiswa.jamMasuk) {
+            // [PERBAIKAN] App Guru memparsing jamMasuk sebagai UTC lalu mengkonversinya ke waktu lokal (+7 WIB).
+            // Karena dari DB jamMasuk terbaca sebagai "1970-01-01T09:37:00.000Z" (sudah jam 9),
+            // saat di app Guru ditambah 7 jam menjadi 16:37.
+            // Solusi: Kita kurangi 7 jam di sini agar saat ditambah 7 jam oleh app Guru menjadi pas 09:37.
+            adjustedJamMasuk = new Date(absenSiswa.jamMasuk.getTime() - (7 * 60 * 60 * 1000));
+        }
+
         return {
             id: siswa.id,
             nama: siswa.namaLengkap,
             nis: siswa.nis,
             status: statusSiswa,
-            jamMasuk: absenSiswa ? absenSiswa.jamMasuk : null,
+            jamMasuk: adjustedJamMasuk,
             keterangan: keterangan
         };
     });
