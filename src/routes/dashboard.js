@@ -165,7 +165,7 @@ router.get('/stats', async (req, res) => {
       // Tarik siswa yang sedang Izin/Sakit hari ini
       const perizinanHariIni = await prisma.perizinan.findMany({
           where: {
-              tanggalMulai: { lte: new Date() },
+              tanggalMulai: { lte: startOfDay },
               tanggalSelesai: { gte: startOfDay },
               status: 'Disetujui'
           },
