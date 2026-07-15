@@ -51,6 +51,12 @@ const sendPushNotification = async (fcmToken, title, body, data = {}) => {
         click_action: 'FLUTTER_NOTIFICATION_CLICK',
         ...data
       },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'high_importance_channel'
+        }
+      },
       token: fcmToken
     };
 

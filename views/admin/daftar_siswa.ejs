@@ -127,6 +127,8 @@
         <div
             class="bg-primary rounded-3xl p-4 flex justify-between items-center text-white mb-8 shadow-lg shadow-primary/20">
             <form action="/daftar-siswa" method="GET" class="relative w-96 ml-2">
+                <% if (typeof selectedTaId !== 'undefined' && selectedTaId !== null) { %><input type="hidden" name="taId" value="<%= selectedTaId %>"><% } else { %><input type="hidden" name="taId" value="all"><% } %>
+                <% if (typeof selectedSort !== 'undefined') { %><input type="hidden" name="sort" value="<%= selectedSort %>"><% } %>
                 <span class="absolute left-4 top-2.5 opacity-50">🔍</span>
                 <input type="text" name="search" value="<%= typeof search !== 'undefined' ? search : '' %>"
                     placeholder="Cari siswa, NIS, atau email..."
@@ -171,11 +173,56 @@
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center">
                 <div>
                     <p class="text-gray-400 text-xs font-bold uppercase">Dalam Izin</p>
-                    <h3 class="text-3xl font-bold text-gray-800 mt-1">0</h3>
+                    <h3 class="text-3xl font-bold text-gray-800 mt-1"><%= typeof dalamIzinCount !== 'undefined' ? dalamIzinCount : 0 %></h3>
                 </div>
                 <div class="bg-orange-50 border border-orange-100 p-4 rounded-full text-2xl text-orange-500">🌙</div>
             </div>
         </div>
+
+        <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+            <h2 class="text-2xl font-black text-primary-dark">Tabel Daftar Siswa</h2>
+            <div class="flex items-center gap-4 flex-wrap">
+                <div class="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+                    <label for="filterTA" class="text-xs font-bold text-gray-600 whitespace-nowrap">Filter TA:</label>
+                    <select id="filterTA" class="bg-slate-50 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:border-primary-light font-bold text-primary-dark" onchange="applyFilters()">
+                        <option value="all" <%= typeof selectedTaId !== 'undefined' && selectedTaId === null ? 'selected' : '' %>>Semua TA</option>
+                        <% if (typeof taList !== 'undefined') { %>
+                            <% taList.forEach(t => { %>
+                                <option value="<%= t.id %>" <%= typeof selectedTaId !== 'undefined' && selectedTaId == t.id ? 'selected' : '' %>>
+                                    <%= t.tahunAjaran %> (<%= t.semester %>)
+                                </option>
+                            <% }) %>
+                        <% } %>
+                    </select>
+                </div>
+                
+                <div class="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+                    <label for="filterSort" class="text-xs font-bold text-gray-600 whitespace-nowrap">Urutkan:</label>
+                    <select id="filterSort" class="bg-slate-50 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:border-primary-light font-bold text-primary-dark" onchange="applyFilters()">
+                        <option value="id_desc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'id_desc' ? 'selected' : '' %>>Terbaru Ditambahkan</option>
+                        <option value="abjad_asc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'abjad_asc' ? 'selected' : '' %>>Abjad (A-Z)</option>
+                        <option value="abjad_desc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'abjad_desc' ? 'selected' : '' %>>Abjad (Z-A)</option>
+                        <option value="nis_asc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'nis_asc' ? 'selected' : '' %>>NIS (↑)</option>
+                        <option value="nis_desc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'nis_desc' ? 'selected' : '' %>>NIS (↓)</option>
+                        <option value="angkatan_asc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'angkatan_asc' ? 'selected' : '' %>>Angkatan (↑)</option>
+                        <option value="angkatan_desc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'angkatan_desc' ? 'selected' : '' %>>Angkatan (↓)</option>
+                        <option value="kelas_asc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'kelas_asc' ? 'selected' : '' %>>Kelas (A-Z)</option>
+                        <option value="kelas_desc" <%= typeof selectedSort !== 'undefined' && selectedSort === 'kelas_desc' ? 'selected' : '' %>>Kelas (Z-A)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            function applyFilters() {
+                const taId = document.getElementById('filterTA').value;
+                const sort = document.getElementById('filterSort').value;
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.set('taId', taId);
+                urlParams.set('sort', sort);
+                window.location.href = '/daftar-siswa?' + urlParams.toString();
+            }
+        </script>
 
         <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-x-auto"><table class="w-full text-left">
                 <thead class="bg-slate-50 text-[10px] text-gray-400 uppercase tracking-wider font-bold">

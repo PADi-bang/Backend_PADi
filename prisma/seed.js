@@ -77,9 +77,9 @@ async function main() {
   // Master Angkatan
   await prisma.masterAngkatan.createMany({
     data: [
-      { id: 1, sekolahId: 1, nomorAngkatan: '2026', isActive: true }, // Untuk kelas X
-      { id: 2, sekolahId: 1, nomorAngkatan: '2025', isActive: true }, // Untuk kelas XI
-      { id: 3, sekolahId: 1, nomorAngkatan: '2024', isActive: true }  // Untuk kelas XII
+      { id: 1, sekolahId: 1, nomorAngkatan: 'Angkatan ke-1', isActive: true }, // Untuk kelas X
+      { id: 2, sekolahId: 1, nomorAngkatan: 'Angkatan ke-2', isActive: true }, // Untuk kelas XI
+      { id: 3, sekolahId: 1, nomorAngkatan: 'Angkatan ke-3', isActive: true }  // Untuk kelas XII
     ]
   });
 
@@ -155,17 +155,17 @@ async function main() {
 
   // 9 Siswa Users
   const siswas = [
-    // Angkatan 2026 -> Kelas X (enrolmentKelasId 1)
+    // Angkatan ke-1 -> Kelas X (enrolmentKelasId 1)
     { id: 5, username: 'aditya', email: 'aditya.pratama@padi.com', idSiswa: 1, nama: 'Aditya Pratama', nis: '10001', angkatanId: 1 },
     { id: 6, username: 'beni', email: 'beni.saputra@padi.com', idSiswa: 2, nama: 'Beni Saputra', nis: '10002', angkatanId: 1 },
     { id: 7, username: 'citra', email: 'citra.lestari@padi.com', idSiswa: 3, nama: 'Citra Lestari', nis: '10003', angkatanId: 1 },
 
-    // Angkatan 2025 -> Kelas XI (enrolmentKelasId 2)
+    // Angkatan ke-2 -> Kelas XI (enrolmentKelasId 2)
     { id: 8, username: 'dina', email: 'dina.mariana@padi.com', idSiswa: 4, nama: 'Dina Mariana', nis: '10004', angkatanId: 2 },
     { id: 9, username: 'eko', email: 'eko.prasetyo@padi.com', idSiswa: 5, nama: 'Eko Prasetyo', nis: '10005', angkatanId: 2 },
     { id: 10, username: 'farhan', email: 'farhan.maulana@padi.com', idSiswa: 6, nama: 'Farhan Maulana', nis: '10006', angkatanId: 2 },
 
-    // Angkatan 2024 -> Kelas XII (enrolmentKelasId 3)
+    // Angkatan ke-3 -> Kelas XII (enrolmentKelasId 3)
     { id: 11, username: 'gita', email: 'gita.cahyani@padi.com', idSiswa: 7, nama: 'Gita Cahyani', nis: '10007', angkatanId: 3 },
     { id: 12, username: 'hendra', email: 'hendra.wijaya@padi.com', idSiswa: 8, nama: 'Hendra Wijaya', nis: '10008', angkatanId: 3 },
     { id: 13, username: 'indah', email: 'indah.permata@padi.com', idSiswa: 9, nama: 'Indah Permata', nis: '10009', angkatanId: 3 }

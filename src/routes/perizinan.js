@@ -263,6 +263,17 @@ router.put('/:id/status', async (req, res) => {
                 const startDate = new Date(izin.tanggalMulai);
                 const endDate = new Date(izin.tanggalSelesai);
                 
+                // Hapus pengajuan izin lain yang bertabrakan (overlap) dan masih Pending
+                await prisma.perizinan.deleteMany({
+                    where: {
+                        siswaId: izin.siswaId,
+                        status: 'Pending',
+                        id: { not: izinId },
+                        tanggalMulai: { lte: izin.tanggalSelesai },
+                        tanggalSelesai: { gte: izin.tanggalMulai }
+                    }
+                });
+                
                 // Looping dari tanggal mulai sampai tanggal selesai
                 for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                     const current = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));

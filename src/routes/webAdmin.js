@@ -431,7 +431,32 @@ router.get('/daftar-siswa', async (req, res) => {
                 ]
             };
         }
-        const activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: req.session.sekolahId } });
+        const taList = await prisma.masterTahunAkademik.findMany({ where: { sekolahId: req.session.sekolahId }, orderBy: { tahunAjaran: 'asc' } });
+        
+        const taId = req.query.taId;
+        let activeTa = null;
+        if (taId === 'all') {
+            activeTa = null;
+        } else if (taId) {
+            activeTa = await prisma.masterTahunAkademik.findUnique({ where: { id: parseInt(taId) } });
+        } else {
+            activeTa = await prisma.masterTahunAkademik.findFirst({ where: { isActive: true, sekolahId: req.session.sekolahId } });
+        }
+
+        if (activeTa) {
+            whereClause = {
+                ...whereClause,
+                siswa: {
+                    ...whereClause.siswa,
+                    enrolmentSiswa: {
+                        some: {
+                            enrolmentKelas: { tahunAkademikId: activeTa.id }
+                        }
+                    }
+                }
+            };
+        }
+
         const siswas = await prisma.user.findMany({
             where: whereClause,
             include: {
@@ -439,19 +464,63 @@ router.get('/daftar-siswa', async (req, res) => {
                     include: {
                         masterAngkatan: true,
                         enrolmentSiswa: { 
-                            where: { 
-                                isActive: true,
-                                ...(activeTa ? { enrolmentKelas: { tahunAkademikId: activeTa.id } } : {})
-                            }, 
+                            where: activeTa ? { enrolmentKelas: { tahunAkademikId: activeTa.id } } : {}, 
                             include: { enrolmentKelas: { include: { masterKelas: { include: { tingkat: true } } } } } 
                         }
                     }
                 }
-            },
-            orderBy: { id: 'desc' }
+            }
         });
+
+        const sort = req.query.sort || 'id_desc';
+        siswas.sort((a, b) => {
+            const sA = a.siswa || {};
+            const sB = b.siswa || {};
+            
+            if (sort === 'abjad_asc') return (sA.namaLengkap || '').localeCompare(sB.namaLengkap || '');
+            if (sort === 'abjad_desc') return (sB.namaLengkap || '').localeCompare(sA.namaLengkap || '');
+            if (sort === 'nis_asc') return (sA.nis || '').localeCompare(sB.nis || '');
+            if (sort === 'nis_desc') return (sB.nis || '').localeCompare(sA.nis || '');
+            
+            const angkA = sA.masterAngkatan ? sA.masterAngkatan.nomorAngkatan : '';
+            const angkB = sB.masterAngkatan ? sB.masterAngkatan.nomorAngkatan : '';
+            if (sort === 'angkatan_asc') return angkA.localeCompare(angkB);
+            if (sort === 'angkatan_desc') return angkB.localeCompare(angkA);
+
+            const getKelasStr = (s) => {
+                if (s.enrolmentSiswa && s.enrolmentSiswa.length > 0) {
+                    const mk = s.enrolmentSiswa[0].enrolmentKelas.masterKelas;
+                    return mk.tingkat ? `${mk.tingkat.namaTingkat} ${mk.namaKelas}` : mk.namaKelas;
+                }
+                return '';
+            };
+            const kelasA = getKelasStr(sA);
+            const kelasB = getKelasStr(sB);
+            if (sort === 'kelas_asc') return kelasA.localeCompare(kelasB);
+            if (sort === 'kelas_desc') return kelasB.localeCompare(kelasA);
+
+            // default id_desc
+            return b.id - a.id;
+        });
+
         const masterAngkatan = await prisma.masterAngkatan.findMany({ where: { sekolahId: req.session.sekolahId }, orderBy: { nomorAngkatan: 'asc' } });
-        res.render('admin/daftar_siswa', { title: 'Daftar Siswa', siswas, masterAngkatan, search: search || '' });
+
+        const nowWIBString = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+        const nowWIB = new Date(nowWIBString);
+        const startOfDay = new Date(Date.UTC(nowWIB.getFullYear(), nowWIB.getMonth(), nowWIB.getDate()));
+
+        const perizinanHariIni = await prisma.perizinan.findMany({
+            where: {
+                siswa: { sekolahId: req.session.sekolahId },
+                status: 'Disetujui',
+                tanggalMulai: { lte: startOfDay },
+                tanggalSelesai: { gte: startOfDay }
+            },
+            distinct: ['siswaId']
+        });
+        const dalamIzinCount = perizinanHariIni.length;
+
+        res.render('admin/daftar_siswa', { title: 'Daftar Siswa', siswas, masterAngkatan, search: search || '', dalamIzinCount, taList, selectedTaId: activeTa ? activeTa.id : null, selectedSort: sort });
     } catch (err) {
         res.render('admin/error', { message: err.message });
     }
@@ -632,7 +701,14 @@ router.get('/daftar-guru', async (req, res) => {
             }));
         }
 
-        res.render('admin/daftar_guru', { title: 'Daftar Guru', gurus, enrolments: mappedEnrolments, search: search || '' });
+        let nonWalikelasCount = 0;
+        gurus.forEach(user => {
+            if (user.guru && (!user.guru.enrolmentGuru || user.guru.enrolmentGuru.length === 0)) {
+                nonWalikelasCount++;
+            }
+        });
+
+        res.render('admin/daftar_guru', { title: 'Daftar Guru', gurus, enrolments: mappedEnrolments, search: search || '', nonWalikelasCount });
     } catch (err) {
         res.render('admin/error', { message: err.message });
     }
