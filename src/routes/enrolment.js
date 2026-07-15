@@ -340,7 +340,7 @@ router.post('/:id/proses-kenaikan', async (req, res) => {
                             const currentAngkatan = await prisma.masterAngkatan.findUnique({ where: { id: siswaData.angkatanId } });
                             if (currentAngkatan && currentAngkatan.nomorAngkatan) {
                                 let num = parseInt(currentAngkatan.nomorAngkatan.replace(/\D/g, '')) || 0;
-                                const nextAngkatanStr = currentAngkatan.nomorAngkatan.toLowerCase().includes('angkatan') ? `Angkatan ke-${num + 1}` : (num + 1).toString();
+                                const nextAngkatanStr = `Angkatan ke-${num + 1}`;
                                 let nextAngkatanObj = await prisma.masterAngkatan.findFirst({
                                     where: { sekolahId: currentEnrolment.sekolahId, nomorAngkatan: nextAngkatanStr }
                                 });

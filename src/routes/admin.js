@@ -351,13 +351,18 @@ router.post('/siswa/upload', upload.single('file'), async (req, res) => {
                 // 1. Process Angkatan
                 let angkatanId = null;
                 if (angkatanInput) {
+                    // Normalisasi format: jika input adalah angka murni, konversi ke 'Angkatan ke-x'
+                    let normalizedAngkatan = angkatanInput;
+                    if (/^\d+$/.test(angkatanInput)) {
+                        normalizedAngkatan = `Angkatan ke-${angkatanInput}`;
+                    }
                     let angkatan = await prisma.masterAngkatan.findFirst({
-                        where: { nomorAngkatan: { equals: angkatanInput, mode: 'insensitive' } }
+                        where: { nomorAngkatan: { equals: normalizedAngkatan, mode: 'insensitive' } }
                     });
                     if (!angkatan) {
                         // Auto-create angkatan if it doesn't exist
                         angkatan = await prisma.masterAngkatan.create({
-                            data: { nomorAngkatan: angkatanInput, sekolahId: req.session.sekolahId, isActive: true }
+                            data: { nomorAngkatan: normalizedAngkatan, sekolahId: req.session.sekolahId, isActive: true }
                         });
                     }
                     angkatanId = angkatan.id;
