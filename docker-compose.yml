@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: app_padi_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-12345678}
+      POSTGRES_DB: ${DB_NAME:-app_padi}
+    ports:
+      - "5433:5432" # Mengekspos port 5433 ke luar agar tidak konflik dengan port default postgres lokal (5432) jika sudah berjalan
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app_padi_backend
+    restart: always
+    environment:
+      - PORT=3000
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-12345678}
+      - DB_NAME=${DB_NAME:-app_padi}
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-12345678}@db:5432/${DB_NAME:-app_padi}
+      - JWT_SECRET=${JWT_SECRET:-ini_adalah_kunci_rahasia_yang_sangat_aman_wkwk}
+      - FACE_RECOGNITION_THRESHOLD=${FACE_RECOGNITION_THRESHOLD:-0.95}
+      - PYTHON_PATH=python3
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+volumes:
+  pgdata:
+
+networks:
+  app-network:
+    driver: bridge
